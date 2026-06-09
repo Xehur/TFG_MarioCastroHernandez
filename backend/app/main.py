@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.logging_config import setup_logging
 from app.middleware import add_process_time_header
-from app.routers import health
+from app.routers import health, users
 
 # Setup logging
 logger = setup_logging()
@@ -55,7 +55,7 @@ app.middleware("http")(add_process_time_header)
 
 # Incluir routers
 app.include_router(health.router)
-
+app.include_router(users.router)
 
 @app.get("/")
 async def root():

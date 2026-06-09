@@ -25,11 +25,11 @@ class Settings(BaseSettings):
     API_PORT: int = 8000
 
     # Base de datos
-    DATABASE_URL: str = "sqlite:///./test.db"
+    DATABASE_URL: str = "postgresql://postgres:1234@localhost:5432/wsi_db"
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
     DB_USER: str = "postgres"
-    DB_PASSWORD: str = "postgres"
+    DB_PASSWORD: str = "1234"
     DB_NAME: str = "wsi_db"
 
     # CORS

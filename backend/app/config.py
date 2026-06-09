@@ -1,0 +1,64 @@
+"""
+Configuración centralizada de la aplicación
+"""
+import os
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    """
+    Configuración de la aplicación usando Pydantic Settings.
+    Lee variables del archivo .env
+    """
+
+    # Información de la aplicación
+    APP_NAME: str = "WSI Visualization API"
+    APP_VERSION: str = "0.1.0"
+    APP_DESCRIPTION: str = "API para visualización de imágenes WSI con IA"
+
+    # Ambiente
+    ENVIRONMENT: str = "development"
+    DEBUG: bool = True
+
+    # API
+    API_HOST: str = "0.0.0.0"
+    API_PORT: int = 8000
+
+    # Base de datos
+    DATABASE_URL: str = "sqlite:///./test.db"
+    DB_HOST: str = "localhost"
+    DB_PORT: int = 5432
+    DB_USER: str = "postgres"
+    DB_PASSWORD: str = "postgres"
+    DB_NAME: str = "wsi_db"
+
+    # CORS
+    CORS_ORIGINS: list = ["*"]
+    CORS_ALLOW_CREDENTIALS: bool = True
+    CORS_ALLOW_METHODS: list = ["*"]
+    CORS_ALLOW_HEADERS: list = ["*"]
+
+    # Logging
+    LOG_LEVEL: str = "INFO"
+
+    # Uploads
+    UPLOAD_DIR: str = "uploads"
+    MAX_FILE_SIZE: int = 1024 * 1024 * 500  # 500MB
+
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
+
+    @property
+    def is_production(self) -> bool:
+        """Verificar si está en producción"""
+        return self.ENVIRONMENT == "production"
+
+    @property
+    def is_development(self) -> bool:
+        """Verificar si está en desarrollo"""
+        return self.ENVIRONMENT == "development"
+
+
+# Instancia global de configuración
+settings = Settings()

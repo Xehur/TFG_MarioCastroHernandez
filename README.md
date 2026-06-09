@@ -58,7 +58,7 @@ python -m pytest
 - [Arquitectura del Sistema](./docs/ARCHITECTURE.md)
 - [Setup Detallado](./docs/SETUP.md)
 
-## 🔄 Flujo de Trabajo
+##  Flujo de Trabajo
 
 Este proyecto usa **Gitflow Workflow**. 
 
@@ -67,7 +67,7 @@ Este proyecto usa **Gitflow Workflow**.
 - `main`: Rama de producción
 - `develop`: Rama de desarrollo
 
-## ✨ Features
+##  Features
 
 - [ ] Visualización de imágenes WSI
 - [ ] Sistema de anotaciones
@@ -75,7 +75,7 @@ Este proyecto usa **Gitflow Workflow**.
 - [ ] Multi-imagen soporte
 - [ ] Procesamiento paralelo
 
-## 🧪 Testing
+##  Testing
 
 ```bash
 # Backend

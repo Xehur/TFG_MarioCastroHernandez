@@ -43,7 +43,8 @@ class Settings(BaseSettings):
 
     # Uploads
     UPLOAD_DIR: str = "uploads"
-    MAX_FILE_SIZE: int = 1024 * 1024 * 500  # 500MB
+    MAX_FILE_SIZE: int = 1024 * 1024 * 1024 * 10  # 10GB por defecto
+    CHUNK_SIZE: int = 1024 * 1024 * 8  # 8MB chunks para streaming
 
     class Config:
         env_file = ".env"

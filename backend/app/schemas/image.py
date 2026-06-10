@@ -15,10 +15,12 @@ class ImageCreate(ImageBase):
 class ImageResponse(ImageBase):
     id: int
     file_path: str
-    width: int
-    height: int
-    level_count: int
-    downsamples: List[float]
+    width: Optional[int] = None
+    height: Optional[int] = None
+    level_count: Optional[int] = None
+    downsamples: Optional[List[float]] = None
+    properties: Optional[Dict] = None
+    file_size_mb: Optional[float] = None
     created_at: datetime
     updated_at: datetime
 

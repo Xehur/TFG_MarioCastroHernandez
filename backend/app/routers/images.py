@@ -50,7 +50,7 @@ def validate_file_extension(filename: str) -> bool:
 def save_upload_file(upload_file: UploadFile, destination: str) -> int:
     """
     Guarda un archivo subido en el destino especificado usando streaming
-    para evitar cargar todo el archivo en memoria.
+    para evitar cargar el archivo en memoria.
     
     Args:
         upload_file: Archivo subido

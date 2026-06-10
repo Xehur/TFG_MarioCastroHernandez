@@ -3,14 +3,14 @@ Router para manejo de imágenes WSI
 """
 import os
 import logging
-from typing import List
+from typing import List, Dict, Any
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db import SessionLocal
 from app.models.image import Image
-from app.schemas.image import ImageResponse
+from app.schemas.image import ImageResponse, ImageUploadResult, MultipleUploadResponse
 from app.services.wsi.openslide_service import OpenSlideService
 
 router = APIRouter(
@@ -214,3 +214,164 @@ async def get_image(
             detail=f"Imagen con ID {image_id} no encontrada"
         )
     return image
+
+
+def process_single_file(file: UploadFile, user_id: int, db: Session) -> ImageUploadResult:
+    """
+    Procesa un archivo individual y retorna el resultado
+    
+    Args:
+        file: Archivo a procesar
+        user_id: ID del usuario
+        db: Sesión de base de datos
+        
+    Returns:
+        Resultado del procesamiento
+    """
+    try:
+        # Validar extensión
+        if not validate_file_extension(file.filename):
+            return ImageUploadResult(
+                filename=file.filename,
+                success=False,
+                message="Formato no soportado",
+                error=f"Formato no soportado. Permitidos: {', '.join(ALLOWED_EXTENSIONS)}"
+            )
+        
+        # Verificar si ya existe
+        existing_image = db.query(Image).filter(Image.filename == file.filename).first()
+        if existing_image:
+            return ImageUploadResult(
+                filename=file.filename,
+                success=False,
+                message="Archivo ya existe",
+                error=f"Archivo {file.filename} ya existe en el sistema"
+            )
+        
+        # Crear directorio de uploads si no existe
+        os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+        
+        # Guardar archivo con streaming
+        file_path = os.path.join(settings.UPLOAD_DIR, file.filename)
+        file_size = save_upload_file(file, file_path)
+        
+        # Validar tamaño
+        if file_size > settings.MAX_FILE_SIZE:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            return ImageUploadResult(
+                filename=file.filename,
+                success=False,
+                message="Archivo demasiado grande",
+                error=f"Archivo demasiado grande. Máximo: {settings.MAX_FILE_SIZE / (1024*1024*1024):.1f}GB"
+            )
+        
+        logger.info(f"Archivo guardado: {file_path} ({file_size / (1024*1024):.2f}MB)")
+        
+        # Extraer metadatos con OpenSlide
+        try:
+            slide_service = OpenSlideService(file_path)
+            metadata = slide_service.get_metadata()
+            width, height = metadata['dimensions']
+            
+            # Crear registro en BD
+            db_image = Image(
+                filename=file.filename,
+                file_path=file_path,
+                user_id=user_id,
+                width=width,
+                height=height,
+                level_count=metadata['level_count'],
+                downsamples=metadata['downsamples'],
+                properties=metadata['properties'],
+                file_size_mb=round(file_size / (1024 * 1024), 2)
+            )
+            
+            db.add(db_image)
+            db.commit()
+            db.refresh(db_image)
+            
+            slide_service.close()
+            
+            logger.info(f"Imagen registrada en BD: {db_image.id}")
+            
+            return ImageUploadResult(
+                filename=file.filename,
+                success=True,
+                message="Archivo procesado exitosamente",
+                image=ImageResponse.model_validate(db_image)
+            )
+            
+        except Exception as e:
+            # Si falla la extracción de metadatos, eliminar archivo
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            logger.error(f"Error procesando imagen {file.filename}: {e}")
+            return ImageUploadResult(
+                filename=file.filename,
+                success=False,
+                message="Error procesando imagen WSI",
+                error=f"Error procesando imagen WSI: {str(e)}"
+            )
+            
+    except Exception as e:
+        logger.error(f"Error inesperado procesando {file.filename}: {e}")
+        return ImageUploadResult(
+            filename=file.filename,
+            success=False,
+            message="Error inesperado",
+            error=f"Error inesperado: {str(e)}"
+        )
+
+
+@router.post("/upload-multiple", response_model=MultipleUploadResponse, status_code=status.HTTP_207_MULTI_STATUS)
+async def upload_multiple_images(
+    files: List[UploadFile] = File(...),
+    user_id: int = 1,
+    db: Session = Depends(get_db)
+):
+    """
+    Sube múltiples imágenes WSI al servidor (soporte para drag & drop)
+    
+    Args:
+        files: Lista de archivos a subir
+        user_id: ID del usuario (temporal)
+        db: Sesión de base de datos
+        
+    Returns:
+        Resultado del procesamiento de cada archivo
+        
+    Status Code:
+        207 Multi-Status: Algunos archivos pueden tener éxito y otros fallar
+    """
+    if not files:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se enviaron archivos"
+        )
+    
+    logger.info(f"Procesando {len(files)} archivos")
+    
+    results = []
+    successful = 0
+    failed = 0
+    
+    # Procesar cada archivo
+    for file in files:
+        logger.info(f"Procesando archivo: {file.filename}")
+        result = process_single_file(file, user_id, db)
+        results.append(result)
+        
+        if result.success:
+            successful += 1
+        else:
+            failed += 1
+    
+    logger.info(f"Procesamiento completo: {successful} exitosos, {failed} fallidos")
+    
+    return MultipleUploadResponse(
+        total=len(files),
+        successful=successful,
+        failed=failed,
+        results=results
+    )

@@ -26,3 +26,20 @@ class ImageResponse(ImageBase):
 
     class Config:
         from_attributes = True
+
+
+class ImageUploadResult(BaseModel):
+    """Resultado del upload de un archivo individual"""
+    filename: str
+    success: bool
+    message: str
+    image: Optional[ImageResponse] = None
+    error: Optional[str] = None
+
+
+class MultipleUploadResponse(BaseModel):
+    """Respuesta para upload de múltiples archivos"""
+    total: int
+    successful: int
+    failed: int
+    results: List[ImageUploadResult]

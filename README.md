@@ -40,13 +40,7 @@ pip install pre-commit
 pre-commit install
 \`\`\`
 
-### 3. Levantar servicios con Docker
-
-\`\`\`bash
-docker-compose up -d
-\`\`\`
-
-### 4. Setup del backend (en otra terminal)
+### 3. Setup del backend (en otra terminal)
 
 \`\`\`bash
 cd backend

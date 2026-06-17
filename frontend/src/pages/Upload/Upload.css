@@ -1,0 +1,125 @@
+.upload-page {
+  min-height: 100vh;
+  background: #0a0a0a;
+  color: white;
+  padding: 40px 20px;
+}
+
+.upload-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1200px;
+  margin: 0 auto 40px;
+  gap: 20px;
+}
+
+.upload-title h1 {
+  margin: 0 0 8px 0;
+  font-size: 32px;
+  font-weight: 700;
+  color: white;
+}
+
+.upload-title p {
+  margin: 0;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.view-images-btn {
+  padding: 12px 24px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.view-images-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.upload-content {
+  max-width: 1200px;
+  margin: 0 auto 60px;
+}
+
+.upload-info {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.info-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.info-card h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: white;
+}
+
+.info-card ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style: none;
+}
+
+.info-card li {
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+  position: relative;
+  padding-left: 8px;
+}
+
+.info-card li::before {
+  content: '•';
+  position: absolute;
+  left: -12px;
+  color: #4ade80;
+  font-weight: bold;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .upload-page {
+    padding: 20px 16px;
+  }
+
+  .upload-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .upload-title h1 {
+    font-size: 24px;
+  }
+
+  .upload-title p {
+    font-size: 14px;
+  }
+
+  .view-images-btn {
+    width: 100%;
+    justify-content: center;
+    display: flex;
+  }
+
+  .upload-info {
+    grid-template-columns: 1fr;
+  }
+}

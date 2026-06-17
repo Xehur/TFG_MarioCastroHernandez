@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import OpenSeadragon from 'openseadragon';
 import ZoomControls from './ZoomControls';
+import ViewerInfoBar from './ViewerInfoBar';
 import './WSIViewer.css';
 
 /**
@@ -14,6 +15,7 @@ const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError }) => {
     error: null,
   });
   const [viewerReady, setViewerReady] = useState(false);
+  const [imageMetadata, setImageMetadata] = useState(null);
 
   const hasRequiredProps = imageId && apiBaseUrl;
 
@@ -52,6 +54,17 @@ const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError }) => {
           if (mounted) {
             setViewerState({ isLoading: false, error: null });
             setViewerReady(true);
+
+            // Obtener metadatos de la imagen
+            const tiledImage = viewerInstanceRef.current.world.getItemAt(0);
+            if (tiledImage) {
+              const imageSize = tiledImage.getContentSize();
+              setImageMetadata({
+                width: Math.round(imageSize.x),
+                height: Math.round(imageSize.y),
+                level_count: tiledImage.source.maxLevel + 1 || 'N/A',
+              });
+            }
           }
         });
 
@@ -108,6 +121,7 @@ const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError }) => {
       )}
       <div ref={viewerRef} className="wsi-viewer" style={{ width: '100%', height: '100%' }}></div>
       {viewerReady && <ZoomControls viewerRef={viewerInstanceRef} />}
+      {viewerReady && <ViewerInfoBar viewerRef={viewerInstanceRef} imageMetadata={imageMetadata} />}
     </div>
   );
 };

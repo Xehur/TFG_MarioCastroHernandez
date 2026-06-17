@@ -8,6 +8,7 @@ Sistema de visualización de imágenes WSI (Whole Slide Images) construido con R
 - **Vite 8** - Build tool y dev server
 - **React Router DOM** - Navegación
 - **Axios** - Cliente HTTP
+- **OpenSeadragon** - Visualizador de imágenes WSI
 - **ESLint + Prettier** - Linting y formatting
 
 ## 📁 Estructura del Proyecto
@@ -16,11 +17,17 @@ Sistema de visualización de imágenes WSI (Whole Slide Images) construido con R
 src/
 ├── assets/          # Recursos estáticos (imágenes, estilos)
 ├── components/      # Componentes reutilizables
+│   └── wsi/        # Componentes de visualización WSI
+│       └── WSIViewer.jsx
 ├── config/          # Configuración de la aplicación
 ├── hooks/           # Custom React hooks
 ├── pages/           # Componentes de página
+│   └── ImageViewer/ # Visualizador de imágenes WSI
 ├── services/        # Servicios de API
+│   ├── api.js
+│   └── imageService.js
 └── utils/           # Funciones utilitarias
+    └── helpers.js
 ```
 
 ## 🛠️ Setup
@@ -68,6 +75,36 @@ Endpoints disponibles:
 - `GET /images/{id}` - Imagen específica
 - `POST /images/upload` - Subir imagen
 - `POST /images/upload-multiple` - Subir múltiples imágenes
+- `GET /images/{id}/dzi.dzi` - Metadatos DZI para OpenSeadragon
+- `GET /images/{id}/dzi_files/{level}/{col}_{row}.jpeg` - Tiles de imagen
+
+## 🖼️ Visualizador WSI
+
+### Uso del componente WSIViewer
+
+```jsx
+import { WSIViewer } from './components/wsi';
+import config from './config/config';
+
+function MyComponent() {
+  const handleError = (error) => {
+    console.error('Viewer error:', error);
+  };
+
+  return (
+    <WSIViewer
+      imageId={1}
+      apiBaseUrl={config.apiBaseUrl}
+      onError={handleError}
+    />
+  );
+}
+```
+
+### Rutas disponibles
+
+- `/` - Página de inicio
+- `/viewer/:imageId` - Visualizador de imagen WSI
 
 ## 📦 Dependencias Principales
 
@@ -75,6 +112,7 @@ Endpoints disponibles:
 - `react-dom` - ^19.2.6
 - `react-router-dom` - ^7.6.2
 - `axios` - ^1.9.0
+- `openseadragon` - ^5.0.0
 - `vite` - ^8.0.12
 
 ## 🎨 Code Style
@@ -86,4 +124,20 @@ Este proyecto usa:
 Configuración en:
 - `eslint.config.js`
 - `.prettierrc`
+
+## 🧪 Testing
+
+Para probar el visualizador WSI:
+
+1. Asegúrate de que el backend esté corriendo en `http://localhost:8000`
+2. Sube una imagen WSI usando el endpoint `/images/upload`
+3. Navega a `/viewer/{imageId}` para visualizar la imagen
+
+El visualizador incluye:
+- ✅ Zoom y pan suaves
+- ✅ Navegador miniatura
+- ✅ Controles de navegación
+- ✅ Carga progresiva de tiles
+- ✅ Manejo de errores
+
 

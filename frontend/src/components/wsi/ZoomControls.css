@@ -1,0 +1,125 @@
+.zoom-controls {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  background: rgba(0, 0, 0, 0.85);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  min-width: 200px;
+}
+
+.zoom-level-display {
+  text-align: center;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.zoom-percentage {
+  font-size: 24px;
+  font-weight: 700;
+  color: #4ade80;
+  font-variant-numeric: tabular-nums;
+}
+
+.zoom-buttons-group {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.zoom-btn {
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+  min-width: 45px;
+}
+
+.zoom-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.zoom-btn:active {
+  transform: translateY(0);
+}
+
+.zoom-btn-preset {
+  flex: 1;
+  min-width: 35px;
+}
+
+.zoom-btn-control {
+  font-size: 18px;
+  font-weight: 700;
+  flex: 1;
+}
+
+.zoom-info {
+  text-align: center;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.zoom-info small {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .zoom-controls {
+    top: 10px;
+    left: 10px;
+    min-width: 160px;
+    padding: 12px;
+  }
+
+  .zoom-percentage {
+    font-size: 20px;
+  }
+
+  .zoom-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+    min-width: 38px;
+  }
+
+  .zoom-btn-preset {
+    min-width: 30px;
+  }
+
+  .zoom-info {
+    display: none;
+  }
+}
+
+/* Animaciones */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.zoom-controls:hover .zoom-percentage {
+  animation: pulse 1.5s ease-in-out infinite;
+}

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import OpenSeadragon from 'openseadragon';
+import ZoomControls from './ZoomControls';
 import './WSIViewer.css';
 
 /**
@@ -12,6 +13,7 @@ const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError }) => {
     isLoading: true,
     error: null,
   });
+  const [viewerReady, setViewerReady] = useState(false);
 
   const hasRequiredProps = imageId && apiBaseUrl;
 
@@ -32,7 +34,7 @@ const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError }) => {
           prefixUrl: 'https://cdnjs.cloudflare.com/ajax/libs/openseadragon/4.1.0/images/',
           tileSources: dziUrl,
           showNavigator: true,
-          showNavigationControl: true,
+          showNavigationControl: false,
           navigatorPosition: 'BOTTOM_RIGHT',
           animationTime: 0.5,
           blendTime: 0.1,
@@ -49,6 +51,7 @@ const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError }) => {
           console.log('WSI Image opened successfully');
           if (mounted) {
             setViewerState({ isLoading: false, error: null });
+            setViewerReady(true);
           }
         });
 
@@ -104,6 +107,7 @@ const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError }) => {
         </div>
       )}
       <div ref={viewerRef} className="wsi-viewer" style={{ width: '100%', height: '100%' }}></div>
+      {viewerReady && <ZoomControls viewerRef={viewerInstanceRef} />}
     </div>
   );
 };

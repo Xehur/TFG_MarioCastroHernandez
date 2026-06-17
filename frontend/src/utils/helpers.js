@@ -6,6 +6,9 @@
  * Formatea el tamaño de archivo en MB/GB
  */
 export const formatFileSize = sizeInMB => {
+  if (!sizeInMB && sizeInMB !== 0) {
+    return 'N/A';
+  }
   if (sizeInMB >= 1024) {
     return `${(sizeInMB / 1024).toFixed(2)} GB`;
   }

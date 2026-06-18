@@ -130,20 +130,12 @@ const ImageDropZone = ({ onUploadComplete, onUploadError }) => {
       setUploadStatus(prev => ({ ...prev, [id]: 'uploading' }));
       setUploadProgress(prev => ({ ...prev, [id]: 0 }));
 
-      // Simular progreso (el axios no soporta onUploadProgress en todos los casos)
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          const current = prev[id] || 0;
-          if (current < 90) {
-            return { ...prev, [id]: current + 10 };
-          }
-          return prev;
-        });
-      }, 200);
+      const response = await imageService.uploadImage(file, {
+        onProgress: percent => {
+          setUploadProgress(prev => ({ ...prev, [id]: percent }));
+        },
+      });
 
-      const response = await imageService.uploadImage(file);
-
-      clearInterval(progressInterval);
       setUploadProgress(prev => ({ ...prev, [id]: 100 }));
       setUploadStatus(prev => ({ ...prev, [id]: 'success' }));
 
@@ -154,7 +146,7 @@ const ImageDropZone = ({ onUploadComplete, onUploadError }) => {
       return response;
     } catch (error) {
       setUploadStatus(prev => ({ ...prev, [id]: 'error' }));
-      const errorMsg = error.response?.data?.detail || error.message || 'Error al subir el archivo';
+      const errorMsg = error.message || 'Error al subir el archivo';
       setErrors(prev => ({ ...prev, [id]: errorMsg }));
 
       if (onUploadError) {

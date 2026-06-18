@@ -48,6 +48,30 @@
   }
 }
 
+.spinner-small {
+  width: 18px;
+  height: 18px;
+  border-width: 3px;
+  border-top-width: 3px;
+}
+
+.wsi-tiles-loading {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 13px;
+  border-radius: 20px;
+  pointer-events: none;
+  backdrop-filter: blur(2px);
+}
+
 .wsi-viewer-error {
   position: absolute;
   top: 50%;

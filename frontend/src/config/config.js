@@ -7,6 +7,9 @@ const config = {
   environment: import.meta.env.VITE_ENV || 'development',
   isDevelopment: import.meta.env.VITE_ENV === 'development',
   isProduction: import.meta.env.VITE_ENV === 'production',
+  auth: {
+    tokenKey: import.meta.env.VITE_AUTH_TOKEN_KEY || 'wsi_auth_token',
+  },
 };
 
 export default config;

@@ -1,5 +1,6 @@
 import os
 from openslide import OpenSlide, OpenSlideError
+from openslide.deepzoom import DeepZoomGenerator
 from typing import Tuple, List, Optional
 
 
@@ -86,6 +87,32 @@ class OpenSlideService:
 
         region = self.slide.read_region((x, y), level, (tile_size, tile_size))
         return region
+
+    def get_deepzoom_generator(
+        self, tile_size: int = 256, overlap: int = 1, limit_bounds: bool = False
+    ) -> DeepZoomGenerator:
+        """
+        Crea un generador Deep Zoom (DZI) para la imagen.
+
+        DeepZoomGenerator construye la pirámide completa de niveles que
+        espera OpenSeadragon y selecciona automáticamente el nivel de
+        OpenSlide más adecuado para cada nivel DZI, escalando cuando es
+        necesario. Esto evita los tiles en blanco entre niveles.
+
+        Args:
+            tile_size: Tamaño del tile en píxeles
+            overlap: Solapamiento entre tiles (1 reduce las costuras visibles)
+            limit_bounds: Si se recortan los bordes no-imagen
+
+        Returns:
+            Instancia de DeepZoomGenerator
+        """
+        return DeepZoomGenerator(
+            self.slide,
+            tile_size=tile_size,
+            overlap=overlap,
+            limit_bounds=limit_bounds,
+        )
 
     def get_metadata(self) -> dict:
         """

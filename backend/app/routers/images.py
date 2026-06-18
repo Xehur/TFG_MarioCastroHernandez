@@ -15,6 +15,7 @@ from app.db import SessionLocal
 from app.models.image import Image
 from app.schemas.image import ImageResponse, ImageUploadResult, MultipleUploadResponse
 from app.services.wsi.openslide_service import OpenSlideService
+from app.services.wsi.slide_cache import slide_cache
 
 router = APIRouter(
     prefix="/images",
@@ -386,12 +387,16 @@ async def get_dzi_metadata(
     db: Session = Depends(get_db)
 ):
     """
-    Obtiene el archivo DZI (Deep Zoom Image) con metadatos para OpenSeadragon
-    
+    Obtiene el archivo DZI (Deep Zoom Image) con metadatos para OpenSeadragon.
+
+    El XML lo genera DeepZoomGenerator para garantizar que la estructura de
+    niveles, el tamaño de tile y el solapamiento coinciden exactamente con
+    los tiles que sirve el endpoint de tiles.
+
     Args:
         image_id: ID de la imagen
         db: Sesión de base de datos
-        
+
     Returns:
         XML con configuración DZI
     """
@@ -401,28 +406,29 @@ async def get_dzi_metadata(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Imagen con ID {image_id} no encontrada"
         )
-    
+
     # Verificar que el archivo existe
     if not os.path.exists(image.file_path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Archivo de imagen no encontrado"
         )
-    
-    # Tamaño del tile (estándar para OpenSeadragon)
-    tile_size = 256
-    overlap = 0
-    
-    # Formato DZI XML
-    dzi_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
-<Image xmlns="http://schemas.microsoft.com/deepzoom/2008"
-       Format="jpeg"
-       Overlap="{overlap}"
-       TileSize="{tile_size}">
-    <Size Width="{image.width}" Height="{image.height}"/>
-</Image>'''
-    
-    return Response(content=dzi_xml, media_type="application/xml")
+
+    try:
+        _, dzg = slide_cache.get_dzgenerator(image.file_path)
+        dzi_xml = dzg.get_dzi("jpeg")
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"Error generando DZI: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error generando metadatos DZI: {str(e)}"
+        )
+
+    return Response(
+        content=dzi_xml,
+        media_type="application/xml",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @router.get("/{image_id}/dzi_files/{level}/{col}_{row}.jpeg")
@@ -434,15 +440,20 @@ async def get_tile(
     db: Session = Depends(get_db)
 ):
     """
-    Obtiene un tile específico de la imagen WSI para OpenSeadragon
-    
+    Obtiene un tile específico de la imagen WSI para OpenSeadragon.
+
+    Usa DeepZoomGenerator (vía caché) que elige automáticamente el nivel
+    de OpenSlide óptimo para cada nivel DZI y escala cuando es necesario,
+    eliminando los tiles en blanco al cambiar de zoom. Los tiles ya
+    renderizados se sirven desde una caché LRU en memoria.
+
     Args:
         image_id: ID de la imagen
-        level: Nivel de zoom (0 = más zoom out, mayor número = más zoom in)
+        level: Nivel DZI (0 = más alejado, mayor número = más detalle)
         col: Columna del tile
         row: Fila del tile
         db: Sesión de base de datos
-        
+
     Returns:
         Imagen JPEG del tile
     """
@@ -452,52 +463,65 @@ async def get_tile(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Imagen con ID {image_id} no encontrada"
         )
-    
+
     if not os.path.exists(image.file_path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Archivo de imagen no encontrado"
         )
-    
+
+    cache_headers = {"Cache-Control": "public, max-age=86400"}
+
+    # 1. Servir desde caché de tiles si está disponible
+    cached = slide_cache.get_tile_bytes(image.file_path, level, col, row)
+    if cached is not None:
+        return Response(
+            content=cached,
+            media_type="image/jpeg",
+            headers={**cache_headers, "X-Tile-Cache": "HIT"},
+        )
+
     try:
-        slide_service = OpenSlideService(image.file_path)
-        
-        # OpenSeadragon usa niveles invertidos: 0 es el más bajo
-        # OpenSlide usa: 0 es el más alto
-        # Convertir nivel DZI a nivel OpenSlide
-        openslide_level = image.level_count - 1 - level
-        
-        # Asegurar que el nivel es válido
-        if openslide_level < 0:
-            openslide_level = 0
-        elif openslide_level >= image.level_count:
-            openslide_level = image.level_count - 1
-        
-        tile_size = 256
-        
-        # Calcular coordenadas en el nivel base (nivel 0 de OpenSlide)
-        downsample = slide_service.get_downsamples()[openslide_level]
-        x = int(col * tile_size * downsample)
-        y = int(row * tile_size * downsample)
-        
-        # Extraer tile
-        region = slide_service.extract_tile(x, y, openslide_level, tile_size)
-        
-        # Convertir RGBA a RGB
-        if region.mode == 'RGBA':
-            rgb_region = PILImage.new('RGB', region.size, (255, 255, 255))
-            rgb_region.paste(region, mask=region.split()[3])
-            region = rgb_region
-        
-        # Convertir a JPEG
+        _, dzg = slide_cache.get_dzgenerator(image.file_path)
+
+        # Validar que el nivel solicitado existe en la pirámide DZI
+        if level < 0 or level >= dzg.level_count:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Nivel DZI {level} fuera de rango (0-{dzg.level_count - 1})"
+            )
+
+        try:
+            tile = dzg.get_tile(level, (col, row))
+        except (ValueError, IndexError):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tile fuera de los límites de la imagen"
+            )
+
+        # Convertir RGBA a RGB sobre fondo blanco
+        if tile.mode == "RGBA":
+            background = PILImage.new("RGB", tile.size, (255, 255, 255))
+            background.paste(tile, mask=tile.split()[3])
+            tile = background
+        elif tile.mode != "RGB":
+            tile = tile.convert("RGB")
+
         img_byte_arr = io.BytesIO()
-        region.save(img_byte_arr, format='JPEG', quality=85)
-        img_byte_arr.seek(0)
-        
-        slide_service.close()
-        
-        return StreamingResponse(img_byte_arr, media_type="image/jpeg")
-        
+        tile.save(img_byte_arr, format="JPEG", quality=85)
+        tile_bytes = img_byte_arr.getvalue()
+
+        # Guardar en caché para futuras peticiones
+        slide_cache.store_tile_bytes(image.file_path, level, col, row, tile_bytes)
+
+        return Response(
+            content=tile_bytes,
+            media_type="image/jpeg",
+            headers={**cache_headers, "X-Tile-Cache": "MISS"},
+        )
+
+    except HTTPException:
+        raise
     except ValueError as e:
         logger.error(f"Error de valor al obtener tile: {e}")
         raise HTTPException(

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import OpenSeadragon from 'openseadragon';
+import { imageService } from '../../services/imageService';
+import { createPerfMonitor } from '../../utils/perfMonitor';
 import ZoomControls from './ZoomControls';
 import ViewerInfoBar from './ViewerInfoBar';
 import './WSIViewer.css';
@@ -10,11 +12,13 @@ import './WSIViewer.css';
 const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError }) => {
   const viewerRef = useRef(null);
   const viewerInstanceRef = useRef(null);
+  const perfMonitorRef = useRef(null);
   const [viewerState, setViewerState] = useState({
     isLoading: true,
     error: null,
   });
   const [viewerReady, setViewerReady] = useState(false);
+  const [tilesLoading, setTilesLoading] = useState(false);
   const [imageMetadata, setImageMetadata] = useState(null);
 
   const hasRequiredProps = imageId && apiBaseUrl;
@@ -29,7 +33,7 @@ const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError }) => {
 
     const initViewer = () => {
       try {
-        const dziUrl = `${apiBaseUrl}/images/${imageId}/dzi.dzi`;
+        const dziUrl = imageService.getDziUrl(imageId);
 
         viewerInstanceRef.current = OpenSeadragon({
           element: viewerRef.current,
@@ -47,7 +51,23 @@ const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError }) => {
           zoomPerScroll: 2,
           timeout: 120000,
           crossOriginPolicy: 'Anonymous',
+          // --- Optimización de carga (ISSUE 17) ---
+          // Caché de tiles: mantiene más tiles en memoria para re-zoom rápido
+          maxImageCacheCount: 500,
+          // Descargas de tiles en paralelo (lazy loading eficiente)
+          imageLoaderLimit: 6,
+          // Precarga tiles adyacentes para transiciones más suaves
+          preload: true,
+          // Mantiene visibles los tiles de menor resolución hasta que cargan
+          // los de mayor resolución (evita que partes "desaparezcan" al hacer zoom)
+          immediateRender: false,
+          placeholderFillStyle: '#1a1a1a',
+          // Suaviza los bordes entre tiles
+          smoothTileEdgesMinZoom: 1.1,
         });
+
+        const perf = createPerfMonitor(viewerInstanceRef.current);
+        perfMonitorRef.current = perf;
 
         viewerInstanceRef.current.addHandler('open', () => {
           console.log('WSI Image opened successfully');
@@ -63,6 +83,12 @@ const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError }) => {
                 width: Math.round(imageSize.x),
                 height: Math.round(imageSize.y),
                 level_count: tiledImage.source.maxLevel + 1 || 'N/A',
+              });
+
+              // Indicador de carga de tiles: se activa mientras faltan tiles
+              // por renderizar y se apaga cuando la vista está completa
+              tiledImage.addHandler('fully-loaded-change', event => {
+                if (mounted) setTilesLoading(!event.fullyLoaded);
               });
             }
           }
@@ -94,6 +120,10 @@ const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError }) => {
 
     return () => {
       mounted = false;
+      if (perfMonitorRef.current) {
+        perfMonitorRef.current.destroy();
+        perfMonitorRef.current = null;
+      }
       if (viewerInstanceRef.current) {
         viewerInstanceRef.current.destroy();
         viewerInstanceRef.current = null;
@@ -120,6 +150,12 @@ const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError }) => {
         </div>
       )}
       <div ref={viewerRef} className="wsi-viewer" style={{ width: '100%', height: '100%' }}></div>
+      {viewerReady && tilesLoading && (
+        <div className="wsi-tiles-loading" role="status" aria-live="polite">
+          <div className="spinner spinner-small"></div>
+          <span>Cargando tiles…</span>
+        </div>
+      )}
       {viewerReady && <ZoomControls viewerRef={viewerInstanceRef} />}
       {viewerReady && <ViewerInfoBar viewerRef={viewerInstanceRef} imageMetadata={imageMetadata} />}
     </div>

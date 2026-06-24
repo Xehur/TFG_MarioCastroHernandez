@@ -14,6 +14,7 @@ from app.config import settings
 from app.db import Base
 from app.models.user import User
 from app.models.image import Image
+from app.models.annotation import Annotation, AnnotationClass
 
 config = context.config
 

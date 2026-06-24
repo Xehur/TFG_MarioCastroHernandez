@@ -56,9 +56,16 @@
   gap: 6px;
 }
 
+.viewer-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
 .image-viewer-content {
   flex: 1;
   overflow: hidden;
+  position: relative;
 }
 
 .image-viewer-page.loading,

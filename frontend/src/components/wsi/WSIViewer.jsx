@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import OpenSeadragon from 'openseadragon';
 import { imageService } from '../../services/imageService';
+import { authService } from '../../services/authService';
 import { createPerfMonitor } from '../../utils/perfMonitor';
 import ZoomControls from './ZoomControls';
 import ViewerInfoBar from './ViewerInfoBar';
@@ -35,10 +36,17 @@ const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError }) => {
       try {
         const dziUrl = imageService.getDziUrl(imageId);
 
+        // Las peticiones de tiles/DZI deben llevar el token JWT. OpenSeadragon
+        // carga los tiles como peticiones AJAX para poder añadir la cabecera.
+        const token = authService.getToken();
+        const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+
         viewerInstanceRef.current = OpenSeadragon({
           element: viewerRef.current,
           prefixUrl: 'https://cdnjs.cloudflare.com/ajax/libs/openseadragon/4.1.0/images/',
           tileSources: dziUrl,
+          loadTilesWithAjax: true,
+          ajaxHeaders: authHeaders,
           showNavigator: true,
           showNavigationControl: false,
           navigatorPosition: 'BOTTOM_RIGHT',

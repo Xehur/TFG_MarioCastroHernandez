@@ -42,8 +42,10 @@ def db_setup():
 
     # Override para que los tests usen la BD de test
     from app.routers import users, images
+    from app.core import deps
     app.dependency_overrides[users.get_db] = override_get_db
     app.dependency_overrides[images.get_db] = override_get_db
+    app.dependency_overrides[deps.get_db] = override_get_db
 
     yield
 
@@ -53,11 +55,38 @@ def db_setup():
 
 
 @pytest.fixture
-def client(db_setup) -> TestClient:
-    """
-    Fixture que proporciona un cliente de test para la API
-    """
+def anon_client(db_setup) -> TestClient:
+    """Cliente de test SIN autenticar (para probar protección de endpoints)."""
     return TestClient(app)
+
+
+@pytest.fixture
+def auth_headers(anon_client) -> dict:
+    """
+    Registra un usuario de prueba y devuelve la cabecera Authorization
+    con un token JWT válido.
+    """
+    resp = anon_client.post(
+        "/auth/register",
+        json={
+            "email": "testauth@example.com",
+            "password": "testpass123",
+            "full_name": "Test Auth User",
+        },
+    )
+    token = resp.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def client(db_setup, auth_headers) -> TestClient:
+    """
+    Fixture que proporciona un cliente de test YA autenticado.
+    Incluye por defecto la cabecera Bearer en todas las peticiones.
+    """
+    test_client = TestClient(app)
+    test_client.headers.update(auth_headers)
+    return test_client
 
 
 @pytest.fixture

@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 8000
 
+    # Seguridad / Autenticación (JWT)
+    SECRET_KEY: str = "CHANGE-ME-dev-secret-key-please-override-in-env"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 horas
+
     # Base de datos
     DATABASE_URL: str = "postgresql://postgres:1234@localhost:5432/wsi_db"
     DB_HOST: str = "localhost"

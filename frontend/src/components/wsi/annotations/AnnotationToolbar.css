@@ -1,0 +1,100 @@
+.annotation-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  background: #1f2233;
+  border-bottom: 1px solid #2c3047;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-title {
+  font-size: 12px;
+  color: #9aa0b4;
+  margin-right: 4px;
+}
+
+.tool-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: #2a2e44;
+  color: #e0e0e0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tool-btn:hover {
+  background: #343a57;
+}
+
+.tool-btn.active {
+  background: #4f6df5;
+  color: #fff;
+  border-color: #6d86ff;
+}
+
+.tool-icon {
+  font-size: 16px;
+}
+
+.color-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.color-swatch.active {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px #4f6df5;
+}
+
+.color-input {
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.toolbar-grid {
+  gap: 12px;
+}
+
+.grid-toggle,
+.grid-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #e0e0e0;
+}
+
+.grid-field input[type='number'] {
+  width: 64px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid #3a3f5c;
+  background: #2a2e44;
+  color: #fff;
+}
+
+.toolbar-hint {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: #9aa0b4;
+}

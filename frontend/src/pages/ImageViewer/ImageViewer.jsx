@@ -1,6 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { WSIViewer } from '../../components/wsi';
+import {
+  AnnotationLayer,
+  AnnotationToolbar,
+  AnnotationPanel,
+  ClassificationModal,
+  useAnnotations,
+  centerOnAnnotation,
+} from '../../components/wsi/annotations';
 import { imageService } from '../../services/imageService';
 import config from '../../config/config';
 import './ImageViewer.css';
@@ -8,9 +16,32 @@ import './ImageViewer.css';
 const ImageViewer = () => {
   const { imageId } = useParams();
   const navigate = useNavigate();
+  const numericId = parseInt(imageId, 10);
+
   const [imageInfo, setImageInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Instancia de OpenSeadragon (cuando el visor está listo)
+  const [viewer, setViewer] = useState(null);
+
+  // Estado de anotación
+  const [tool, setTool] = useState('select');
+  const [color, setColor] = useState('#FF0000');
+  const [grid, setGrid] = useState({ enabled: false, size: 256, opacity: 0.4 });
+  const [selectedId, setSelectedId] = useState(null);
+  const [pendingShape, setPendingShape] = useState(null);
+  const [editingAnnotation, setEditingAnnotation] = useState(null);
+
+  const {
+    annotations,
+    classes,
+    loading: annotationsLoading,
+    createAnnotation,
+    updateAnnotation,
+    deleteAnnotation,
+    createClass,
+  } = useAnnotations(numericId);
 
   useEffect(() => {
     const fetchImageInfo = async () => {
@@ -32,10 +63,55 @@ const ImageViewer = () => {
     }
   }, [imageId]);
 
-  const handleViewerError = error => {
-    console.error('WSI Viewer error:', error);
-    setError(`Error al cargar la imagen: ${error.message}`);
+  const handleViewerError = useCallback(err => {
+    console.error('WSI Viewer error:', err);
+    setError(`Error al cargar la imagen: ${err.message}`);
+  }, []);
+
+  // Al terminar de dibujar una forma, abrir el modal de clasificación
+  const handleCompleteShape = useCallback(shape => {
+    setPendingShape(shape);
+  }, []);
+
+  const handleSubmitClassification = async ({ label, color: shapeColor, class_id }) => {
+    await createAnnotation({
+      ...pendingShape,
+      label,
+      color: shapeColor,
+      class_id,
+    });
+    setPendingShape(null);
+    setTool('select');
   };
+
+  const handleCenter = useCallback(
+    ann => {
+      if (viewer) centerOnAnnotation(viewer, ann);
+      setSelectedId(ann.id);
+    },
+    [viewer]
+  );
+
+  const handleEdit = useCallback(ann => {
+    setEditingAnnotation(ann);
+  }, []);
+
+  const handleSubmitEdit = async ({ label, color: shapeColor, class_id }) => {
+    await updateAnnotation(editingAnnotation.id, {
+      label,
+      color: shapeColor,
+      class_id,
+    });
+    setEditingAnnotation(null);
+  };
+
+  const handleDelete = useCallback(
+    async id => {
+      await deleteAnnotation(id);
+      setSelectedId(prev => (prev === id ? null : prev));
+    },
+    [deleteAnnotation]
+  );
 
   if (loading) {
     return (
@@ -74,13 +150,75 @@ const ImageViewer = () => {
         </div>
       </header>
 
-      <div className="image-viewer-content">
-        <WSIViewer
-          imageId={parseInt(imageId)}
-          apiBaseUrl={config.apiBaseUrl}
-          onError={handleViewerError}
+      <AnnotationToolbar
+        tool={tool}
+        onToolChange={setTool}
+        color={color}
+        onColorChange={setColor}
+        grid={grid}
+        onGridChange={setGrid}
+      />
+
+      <div className="viewer-body">
+        <div className="image-viewer-content">
+          <WSIViewer
+            imageId={numericId}
+            apiBaseUrl={config.apiBaseUrl}
+            onError={handleViewerError}
+            onViewerReady={setViewer}
+          >
+            <AnnotationLayer
+              viewer={viewer}
+              annotations={annotations}
+              tool={tool}
+              color={color}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onCompleteShape={handleCompleteShape}
+              onCancel={() => setTool('select')}
+              grid={grid}
+            />
+          </WSIViewer>
+        </div>
+
+        <AnnotationPanel
+          annotations={annotations}
+          classes={classes}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onCenter={handleCenter}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          loading={annotationsLoading}
         />
       </div>
+
+      {pendingShape && (
+        <ClassificationModal
+          shape={pendingShape}
+          classes={classes}
+          defaultColor={color}
+          onCreateClass={createClass}
+          onSubmit={handleSubmitClassification}
+          onCancel={() => setPendingShape(null)}
+        />
+      )}
+
+      {editingAnnotation && (
+        <ClassificationModal
+          shape={editingAnnotation}
+          classes={classes}
+          defaultColor={color}
+          initialLabel={editingAnnotation.label || ''}
+          initialClassId={editingAnnotation.class_id}
+          initialColor={editingAnnotation.color}
+          title="Editar anotación"
+          submitLabel="Guardar cambios"
+          onCreateClass={createClass}
+          onSubmit={handleSubmitEdit}
+          onCancel={() => setEditingAnnotation(null)}
+        />
+      )}
     </div>
   );
 };

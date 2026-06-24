@@ -10,7 +10,7 @@ import './WSIViewer.css';
 /**
  * Componente WSIViewer - Visualizador de imágenes WSI usando OpenSeadragon
  */
-const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError }) => {
+const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError, onViewerReady, children }) => {
   const viewerRef = useRef(null);
   const viewerInstanceRef = useRef(null);
   const perfMonitorRef = useRef(null);
@@ -99,6 +99,8 @@ const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError }) => {
                 if (mounted) setTilesLoading(!event.fullyLoaded);
               });
             }
+
+            if (onViewerReady) onViewerReady(viewerInstanceRef.current);
           }
         });
 
@@ -128,6 +130,7 @@ const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError }) => {
 
     return () => {
       mounted = false;
+      if (onViewerReady) onViewerReady(null);
       if (perfMonitorRef.current) {
         perfMonitorRef.current.destroy();
         perfMonitorRef.current = null;
@@ -137,7 +140,7 @@ const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError }) => {
         viewerInstanceRef.current = null;
       }
     };
-  }, [imageId, apiBaseUrl, onError, hasRequiredProps]);
+  }, [imageId, apiBaseUrl, onError, hasRequiredProps, onViewerReady]);
 
   return (
     <div className={`wsi-viewer-container ${className}`}>
@@ -158,6 +161,7 @@ const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError }) => {
         </div>
       )}
       <div ref={viewerRef} className="wsi-viewer" style={{ width: '100%', height: '100%' }}></div>
+      {viewerReady && children}
       {viewerReady && tilesLoading && (
         <div className="wsi-tiles-loading" role="status" aria-live="polite">
           <div className="spinner spinner-small"></div>

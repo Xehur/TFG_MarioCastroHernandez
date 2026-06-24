@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { AlertCircle, ArrowLeft, Ruler, Layers, HardDrive } from 'lucide-react';
 import { WSIViewer } from '../../components/wsi';
 import {
   AnnotationLayer,
@@ -125,7 +126,9 @@ const ImageViewer = () => {
   if (error) {
     return (
       <div className="image-viewer-page error">
-        <h2>❌ Error</h2>
+        <h2>
+          <AlertCircle size={22} /> Error
+        </h2>
         <p>{error}</p>
         <button onClick={() => navigate('/')}>Volver al inicio</button>
       </div>
@@ -136,16 +139,20 @@ const ImageViewer = () => {
     <div className="image-viewer-page">
       <header className="image-viewer-header">
         <button className="back-button" onClick={() => navigate('/')}>
-          ← Volver
+          <ArrowLeft size={16} /> Volver
         </button>
         <div className="image-info">
           <h1>{imageInfo?.filename}</h1>
           <div className="image-metadata">
             <span>
-              📐 {imageInfo?.width} x {imageInfo?.height} px
+              <Ruler size={15} /> {imageInfo?.width} x {imageInfo?.height} px
             </span>
-            <span>📊 {imageInfo?.level_count} niveles</span>
-            <span>💾 {imageInfo?.file_size_mb} MB</span>
+            <span>
+              <Layers size={15} /> {imageInfo?.level_count} niveles
+            </span>
+            <span>
+              <HardDrive size={15} /> {imageInfo?.file_size_mb} MB
+            </span>
           </div>
         </div>
       </header>

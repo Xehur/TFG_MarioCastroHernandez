@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { Hourglass, UploadCloud, CheckCircle2, XCircle, FileText, FolderUp, Trash2, X } from 'lucide-react';
 import { imageService } from '../../services/imageService';
 import { isValidWSIFile } from '../../utils/helpers';
 import './ImageDropZone.css';
@@ -184,15 +185,15 @@ const ImageDropZone = ({ onUploadComplete, onUploadError }) => {
   const getStatusIcon = status => {
     switch (status) {
       case 'pending':
-        return '⏳';
+        return <Hourglass size={18} />;
       case 'uploading':
-        return '📤';
+        return <UploadCloud size={18} />;
       case 'success':
-        return '✅';
+        return <CheckCircle2 size={18} />;
       case 'error':
-        return '❌';
+        return <XCircle size={18} />;
       default:
-        return '📄';
+        return <FileText size={18} />;
     }
   };
 
@@ -209,7 +210,9 @@ const ImageDropZone = ({ onUploadComplete, onUploadError }) => {
         onDrop={handleDrop}
       >
         <div className="drop-zone-content">
-          <div className="drop-icon">📁</div>
+          <div className="drop-icon">
+            <FolderUp size={48} />
+          </div>
           <h3>Arrastra y suelta imágenes WSI aquí</h3>
           <p>o haz clic para seleccionar archivos</p>
           <p className="file-types">Formatos: {ACCEPTED_TYPES.join(', ')}</p>
@@ -234,12 +237,12 @@ const ImageDropZone = ({ onUploadComplete, onUploadError }) => {
             <div className="files-actions">
               {hasFilesToUpload && (
                 <button className="btn btn-primary" onClick={uploadAllFiles}>
-                  📤 Subir todos
+                  <UploadCloud size={16} /> Subir todos
                 </button>
               )}
               {hasSuccessfulUploads && (
                 <button className="btn btn-secondary" onClick={clearAll}>
-                  🗑️ Limpiar completados
+                  <Trash2 size={16} /> Limpiar completados
                 </button>
               )}
             </div>
@@ -279,7 +282,7 @@ const ImageDropZone = ({ onUploadComplete, onUploadError }) => {
                     disabled={uploadStatus[fileObj.id] === 'uploading'}
                     title="Eliminar"
                   >
-                    ✕
+                    <X size={16} />
                   </button>
                 </div>
               </div>

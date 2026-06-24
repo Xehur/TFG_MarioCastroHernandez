@@ -1,3 +1,4 @@
+import { User } from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
 import './UserMenu.css';
 
@@ -12,7 +13,7 @@ const UserMenu = () => {
   return (
     <div className="user-menu">
       <span className="user-menu-email" title={user.email}>
-        👤 {user.full_name || user.email}
+        <User size={16} /> {user.full_name || user.email}
       </span>
       <button className="user-menu-logout" onClick={logout} type="button">
         Cerrar sesión

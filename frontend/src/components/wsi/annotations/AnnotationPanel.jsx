@@ -1,6 +1,7 @@
+import { Square, Circle, Pentagon, Crosshair, Pencil, Trash2 } from 'lucide-react';
 import './AnnotationPanel.css';
 
-const SHAPE_ICON = { rectangle: '▭', circle: '◯', polygon: '⬠' };
+const SHAPE_ICON = { rectangle: Square, circle: Circle, polygon: Pentagon };
 
 /**
  * Panel lateral con la lista de anotaciones guardadas.
@@ -42,14 +43,16 @@ const AnnotationPanel = ({
         </p>
       ) : (
         <ul className="panel-list">
-          {annotations.map(ann => (
+          {annotations.map(ann => {
+            const ShapeIcon = SHAPE_ICON[ann.shape_type];
+            return (
             <li
               key={ann.id}
               className={`panel-item ${ann.id === selectedId ? 'selected' : ''}`}
               onClick={() => onSelect(ann.id)}
             >
               <span className="item-color" style={{ background: ann.color }} />
-              <span className="item-shape">{SHAPE_ICON[ann.shape_type] || '?'}</span>
+              <span className="item-shape">{ShapeIcon ? <ShapeIcon size={16} /> : '?'}</span>
               <div className="item-body">
                 <span className="item-label">{ann.label || '(sin etiqueta)'}</span>
                 {classNameOf(ann.class_id) && (
@@ -58,17 +61,18 @@ const AnnotationPanel = ({
               </div>
               <div className="item-actions" onClick={e => e.stopPropagation()}>
                 <button title="Centrar" onClick={() => onCenter(ann)}>
-                  🎯
+                  <Crosshair size={16} />
                 </button>
                 <button title="Editar" onClick={() => onEdit(ann)}>
-                  ✏️
+                  <Pencil size={16} />
                 </button>
                 <button title="Eliminar" onClick={() => onDelete(ann.id)}>
-                  🗑️
+                  <Trash2 size={16} />
                 </button>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </aside>

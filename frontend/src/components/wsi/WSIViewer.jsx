@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import OpenSeadragon from 'openseadragon';
+import { AlertCircle } from 'lucide-react';
 import { imageService } from '../../services/imageService';
 import { authService } from '../../services/authService';
 import { createPerfMonitor } from '../../utils/perfMonitor';
@@ -146,7 +147,9 @@ const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError, onViewerReady
     <div className={`wsi-viewer-container ${className}`}>
       {!hasRequiredProps && (
         <div className="wsi-viewer-error">
-          <p>❌ Error: imageId y apiBaseUrl son requeridos</p>
+          <p>
+            <AlertCircle size={16} /> Error: imageId y apiBaseUrl son requeridos
+          </p>
         </div>
       )}
       {hasRequiredProps && viewerState.isLoading && (
@@ -157,7 +160,9 @@ const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError, onViewerReady
       )}
       {hasRequiredProps && viewerState.error && (
         <div className="wsi-viewer-error">
-          <p>❌ Error: {viewerState.error}</p>
+          <p>
+            <AlertCircle size={16} /> Error: {viewerState.error}
+          </p>
         </div>
       )}
       <div ref={viewerRef} className="wsi-viewer" style={{ width: '100%', height: '100%' }}></div>

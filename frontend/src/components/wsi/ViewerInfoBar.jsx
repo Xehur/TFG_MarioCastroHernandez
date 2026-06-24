@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { MousePointer2, ZoomIn, Home, Maximize, Minimize } from 'lucide-react';
 import OpenSeadragon from 'openseadragon';
 import './ViewerInfoBar.css';
 
@@ -109,13 +110,17 @@ const ViewerInfoBar = ({ viewerRef, imageMetadata }) => {
       {/* Sección central - Coordenadas del mouse */}
       <div className="info-section center">
         <div className="info-item">
-          <span className="info-label">🖱️ Coordenadas:</span>
+          <span className="info-label">
+            <MousePointer2 size={15} /> Coordenadas:
+          </span>
           <span className="info-value coords">
             X: {mouseCoords.x} | Y: {mouseCoords.y}
           </span>
         </div>
         <div className="info-item">
-          <span className="info-label">🔍 Zoom:</span>
+          <span className="info-label">
+            <ZoomIn size={15} /> Zoom:
+          </span>
           <span className="info-value">{currentZoomLevel}%</span>
         </div>
       </div>
@@ -123,7 +128,9 @@ const ViewerInfoBar = ({ viewerRef, imageMetadata }) => {
       {/* Sección derecha - Controles */}
       <div className="info-section controls">
         <button className="control-btn" onClick={handleGoHome} title="Volver a vista inicial">
-          <span className="btn-icon">🏠</span>
+          <span className="btn-icon">
+            <Home size={16} />
+          </span>
           <span className="btn-label">Home</span>
         </button>
         <button
@@ -131,7 +138,7 @@ const ViewerInfoBar = ({ viewerRef, imageMetadata }) => {
           onClick={handleFullscreen}
           title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
         >
-          <span className="btn-icon">{isFullscreen ? '⛶' : '⛶'}</span>
+          <span className="btn-icon">{isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}</span>
           <span className="btn-label">{isFullscreen ? 'Exit' : 'Fullscreen'}</span>
         </button>
       </div>

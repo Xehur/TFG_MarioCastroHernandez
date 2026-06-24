@@ -5,26 +5,34 @@
 }
 
 .user-menu-email {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 14px;
-  color: #333;
+  color: rgba(255, 255, 255, 0.9);
   max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.user-menu-email .lucide {
+  color: #cf8fd8;
+}
+
 .user-menu-logout {
   padding: 8px 14px;
-  background: #c0392b;
+  background: rgba(255, 255, 255, 0.1);
   color: #fff;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s;
 }
 
 .user-menu-logout:hover {
-  background: #a93226;
+  background: rgba(255, 107, 157, 0.2);
+  border-color: #ff6b9d;
 }

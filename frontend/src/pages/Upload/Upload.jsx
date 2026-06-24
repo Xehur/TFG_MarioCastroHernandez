@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { UploadCloud, LayoutGrid, Info, Ruler, Rocket } from 'lucide-react';
 import { ImageDropZone } from '../../components/upload';
 import './Upload.css';
 
@@ -26,11 +27,13 @@ const Upload = () => {
     <div className="upload-page">
       <div className="upload-header">
         <div className="upload-title">
-          <h1>📤 Subir Imágenes WSI</h1>
+          <h1>
+            <UploadCloud size={24} /> Subir Imágenes WSI
+          </h1>
           <p>Carga tus imágenes de Whole Slide Image para visualización y análisis</p>
         </div>
         <button className="view-images-btn" onClick={handleViewImages}>
-          📋 Ver imágenes
+          <LayoutGrid size={16} /> Ver imágenes
         </button>
       </div>
 
@@ -40,7 +43,9 @@ const Upload = () => {
 
       <div className="upload-info">
         <div className="info-card">
-          <h3>ℹ️ Formatos soportados</h3>
+          <h3>
+            <Info size={18} /> Formatos soportados
+          </h3>
           <ul>
             <li>.svs (Aperio)</li>
             <li>.tif, .tiff (Generic TIFF)</li>
@@ -53,7 +58,9 @@ const Upload = () => {
         </div>
 
         <div className="info-card">
-          <h3>📏 Límites</h3>
+          <h3>
+            <Ruler size={18} /> Límites
+          </h3>
           <ul>
             <li>Tamaño máximo: 2GB por archivo</li>
             <li>Múltiples archivos permitidos</li>
@@ -62,7 +69,9 @@ const Upload = () => {
         </div>
 
         <div className="info-card">
-          <h3>🚀 Cómo usarlo</h3>
+          <h3>
+            <Rocket size={18} /> Cómo usarlo
+          </h3>
           <ul>
             <li>Arrastra archivos a la zona de carga</li>
             <li>O haz clic para seleccionar archivos</li>

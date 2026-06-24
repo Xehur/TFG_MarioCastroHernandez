@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { Check, X } from 'lucide-react';
 import { elementToImage, imageToElement, imageDistanceToElement, getImageSize } from './geometry';
 import './AnnotationLayer.css';
 
@@ -393,10 +394,10 @@ const AnnotationLayer = ({
             onClick={finishPolygon}
             disabled={polygonPoints.length < 3}
           >
-            ✓ Finalizar
+            <Check size={15} /> Finalizar
           </button>
           <button type="button" className="polygon-btn cancel" onClick={cancelPolygon}>
-            ✕ Cancelar
+            <X size={15} /> Cancelar
           </button>
         </div>
       )}

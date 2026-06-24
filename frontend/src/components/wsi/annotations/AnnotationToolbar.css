@@ -4,8 +4,9 @@
   align-items: center;
   gap: 16px;
   padding: 10px 16px;
-  background: #1f2233;
-  border-bottom: 1px solid #2c3047;
+  background: rgba(28, 19, 48, 0.85);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(178, 69, 146, 0.2);
 }
 
 .toolbar-group {
@@ -16,7 +17,7 @@
 
 .toolbar-title {
   font-size: 12px;
-  color: #9aa0b4;
+  color: #b9a8cc;
   margin-right: 4px;
 }
 
@@ -25,9 +26,9 @@
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  background: #2a2e44;
-  color: #e0e0e0;
-  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e8e0f0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   font-size: 13px;
   cursor: pointer;
@@ -35,13 +36,14 @@
 }
 
 .tool-btn:hover {
-  background: #343a57;
+  background: rgba(178, 69, 146, 0.18);
+  border-color: rgba(178, 69, 146, 0.4);
 }
 
 .tool-btn.active {
-  background: #4f6df5;
+  background: linear-gradient(135deg, #8e2de2 0%, #b24592 100%);
   color: #fff;
-  border-color: #6d86ff;
+  border-color: #b24592;
 }
 
 .tool-icon {
@@ -59,7 +61,7 @@
 
 .color-swatch.active {
   border-color: #fff;
-  box-shadow: 0 0 0 2px #4f6df5;
+  box-shadow: 0 0 0 2px #b24592;
 }
 
 .color-input {
@@ -81,20 +83,20 @@
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: #e0e0e0;
+  color: #e8e0f0;
 }
 
 .grid-field input[type='number'] {
   width: 64px;
   padding: 4px 6px;
   border-radius: 6px;
-  border: 1px solid #3a3f5c;
-  background: #2a2e44;
+  border: 1px solid rgba(178, 69, 146, 0.4);
+  background: rgba(255, 255, 255, 0.06);
   color: #fff;
 }
 
 .toolbar-hint {
   flex-basis: 100%;
   font-size: 12px;
-  color: #9aa0b4;
+  color: #b9a8cc;
 }

@@ -108,3 +108,8 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+/* Alineado vertical de iconos lucide en linea con texto */
+.lucide {
+  vertical-align: -0.18em;
+}

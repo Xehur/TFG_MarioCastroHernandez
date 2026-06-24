@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Lightbulb } from 'lucide-react';
 import './ZoomControls.css';
 
 /**
@@ -121,7 +122,7 @@ const ZoomControls = ({ viewerRef }) => {
 
       <div className="zoom-info">
         <small>
-          💡 Usa scroll del ratón para zoom
+          <Lightbulb size={14} /> Usa scroll del ratón para zoom
           <br />
           Arrastra para navegar (pan)
         </small>

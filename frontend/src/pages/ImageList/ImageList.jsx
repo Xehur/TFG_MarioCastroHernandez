@@ -1,5 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  AlertCircle,
+  LayoutGrid,
+  Plus,
+  FolderOpen,
+  Ruler,
+  Layers,
+  HardDrive,
+  Calendar,
+  Eye,
+} from 'lucide-react';
 import { imageService } from '../../services/imageService';
 import { formatFileSize, formatDate } from '../../utils/helpers';
 import UserMenu from '../../components/auth/UserMenu';
@@ -66,7 +77,9 @@ const ImageList = () => {
   if (error) {
     return (
       <div className="image-list-page error">
-        <h2>❌ Error</h2>
+        <h2>
+          <AlertCircle size={22} /> Error
+        </h2>
         <p>{error}</p>
         <button onClick={loadImagesManually}>Reintentar</button>
       </div>
@@ -77,12 +90,14 @@ const ImageList = () => {
     <div className="image-list-page">
       <div className="image-list-header">
         <div className="header-title">
-          <h1>📋 Imágenes WSI</h1>
+          <h1>
+            <LayoutGrid size={24} /> Imágenes WSI
+          </h1>
           <p>{images.length} imagen(es) disponible(s)</p>
         </div>
         <div className="header-actions">
           <button className="upload-btn" onClick={handleUploadNew}>
-            ➕ Subir nueva imagen
+            <Plus size={16} /> Subir nueva imagen
           </button>
           <UserMenu />
         </div>
@@ -90,11 +105,13 @@ const ImageList = () => {
 
       {images.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-icon">📂</div>
+          <div className="empty-icon">
+            <FolderOpen size={48} />
+          </div>
           <h2>No hay imágenes</h2>
           <p>Sube tu primera imagen WSI para comenzar</p>
           <button className="upload-btn-large" onClick={handleUploadNew}>
-            ➕ Subir imagen
+            <Plus size={18} /> Subir imagen
           </button>
         </div>
       ) : (
@@ -108,30 +125,40 @@ const ImageList = () => {
 
               <div className="image-card-info">
                 <div className="info-row">
-                  <span className="info-label">📐 Dimensiones:</span>
+                  <span className="info-label">
+                    <Ruler size={15} /> Dimensiones:
+                  </span>
                   <span className="info-value">
                     {image.width} × {image.height}
                   </span>
                 </div>
 
                 <div className="info-row">
-                  <span className="info-label">📊 Niveles:</span>
+                  <span className="info-label">
+                    <Layers size={15} /> Niveles:
+                  </span>
                   <span className="info-value">{image.level_count || 'N/A'}</span>
                 </div>
 
                 <div className="info-row">
-                  <span className="info-label">💾 Tamaño:</span>
+                  <span className="info-label">
+                    <HardDrive size={15} /> Tamaño:
+                  </span>
                   <span className="info-value">{formatFileSize(image.file_size_mb)}</span>
                 </div>
 
                 <div className="info-row">
-                  <span className="info-label">📅 Subido:</span>
+                  <span className="info-label">
+                    <Calendar size={15} /> Subido:
+                  </span>
                   <span className="info-value">{formatDate(image.created_at)}</span>
                 </div>
               </div>
 
               <div className="image-card-footer">
-                <button className="view-btn">👁️ Ver imagen</button>
+                <button className="view-btn">
+                  <Eye size={16} /> Ver imagen
+                </button>
               </div>
             </div>
           ))}

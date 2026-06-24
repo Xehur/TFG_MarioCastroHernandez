@@ -1,10 +1,11 @@
+import { MousePointer2, Square, Circle, Pentagon } from 'lucide-react';
 import './AnnotationToolbar.css';
 
 const TOOLS = [
-  { id: 'select', label: 'Seleccionar', icon: '🖱️' },
-  { id: 'rectangle', label: 'Rectángulo', icon: '▭' },
-  { id: 'circle', label: 'Círculo', icon: '◯' },
-  { id: 'polygon', label: 'Polígono', icon: '⬠' },
+  { id: 'select', label: 'Seleccionar', Icon: MousePointer2 },
+  { id: 'rectangle', label: 'Rectángulo', Icon: Square },
+  { id: 'circle', label: 'Círculo', Icon: Circle },
+  { id: 'polygon', label: 'Polígono', Icon: Pentagon },
 ];
 
 const PRESET_COLORS = ['#FF0000', '#00C853', '#2962FF', '#FFD600', '#AA00FF', '#FF6D00'];
@@ -28,7 +29,9 @@ const AnnotationToolbar = ({ tool, onToolChange, color, onColorChange, grid, onG
             title={t.label}
             type="button"
           >
-            <span className="tool-icon">{t.icon}</span>
+            <span className="tool-icon">
+              <t.Icon size={18} strokeWidth={2} />
+            </span>
             <span className="tool-label">{t.label}</span>
           </button>
         ))}

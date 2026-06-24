@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Microscope, Layers, ScanSearch, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
 import '../../components/auth/Auth.css';
 
@@ -34,10 +35,44 @@ const Login = () => {
   };
 
   return (
-    <div className="auth-page">
+    <div className="auth-page auth-split">
+      <aside className="auth-hero">
+        <div className="auth-hero-overlay" />
+        <div className="auth-hero-content">
+          <div className="auth-brand">
+            <div className="auth-brand-logo">
+              <Microscope size={44} />
+            </div>
+            <span className="auth-brand-name">WSI Viewer</span>
+          </div>
+          <h2 className="auth-hero-title">
+            Explora imágenes histológicas con precisión clínica
+          </h2>
+          <p className="auth-hero-text">
+            Visualiza, anota y clasifica Whole Slide Images de alta resolución desde tu navegador.
+          </p>
+          <ul className="auth-hero-features">
+            <li>
+              <ScanSearch size={18} /> Zoom fluido por niveles
+            </li>
+            <li>
+              <Layers size={18} /> Anotaciones y clasificación
+            </li>
+            <li>
+              <ShieldCheck size={18} /> Acceso autenticado con token
+            </li>
+          </ul>
+        </div>
+      </aside>
+
       <div className="auth-card">
-        <h1>Iniciar sesión</h1>
-        <p className="auth-subtitle">Visor de imágenes WSI</p>
+        <div className="auth-card-head">
+          <div className="auth-card-logo">
+            <Microscope size={26} />
+          </div>
+          <h1>Iniciar sesión</h1>
+          <p className="auth-subtitle">Accede a tu visor de imágenes WSI</p>
+        </div>
         <form className="auth-form" onSubmit={handleSubmit}>
           {error && <div className="auth-error">{error}</div>}
           <div className="auth-field">

@@ -2,7 +2,8 @@
   position: absolute;
   top: 20px;
   left: 20px;
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(20, 12, 26, 0.9);
+  border: 1px solid rgba(178, 69, 146, 0.2);
   border-radius: 12px;
   padding: 16px;
   display: flex;
@@ -24,7 +25,7 @@
 .zoom-percentage {
   font-size: 24px;
   font-weight: 700;
-  color: #4ade80;
+  color: #cf8fd8;
   font-variant-numeric: tabular-nums;
 }
 
@@ -49,8 +50,8 @@
 }
 
 .zoom-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(178, 69, 146, 0.25);
+  border-color: #b24592;
   transform: translateY(-1px);
 }
 
@@ -73,6 +74,11 @@
   text-align: center;
   padding-top: 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.zoom-info small .lucide {
+  color: #cf8fd8;
+  vertical-align: -0.15em;
 }
 
 .zoom-info small {

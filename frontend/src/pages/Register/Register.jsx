@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Microscope } from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
 import '../../components/auth/Auth.css';
 
@@ -40,8 +41,13 @@ const Register = () => {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1>Crear cuenta</h1>
-        <p className="auth-subtitle">Visor de imágenes WSI</p>
+        <div className="auth-card-head">
+          <div className="auth-card-logo">
+            <Microscope size={26} />
+          </div>
+          <h1>Crear cuenta</h1>
+          <p className="auth-subtitle">Visor de imágenes WSI</p>
+        </div>
         <form className="auth-form" onSubmit={handleSubmit}>
           {error && <div className="auth-error">{error}</div>}
           <div className="auth-field">

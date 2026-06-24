@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Lightbulb } from 'lucide-react';
+import { Lightbulb, Minus, Plus, House } from 'lucide-react';
 import './ZoomControls.css';
 
 /**
@@ -110,13 +110,13 @@ const ZoomControls = ({ viewerRef }) => {
 
       <div className="zoom-buttons-group">
         <button className="zoom-btn zoom-btn-control" onClick={handleZoomOut} title="Zoom Out">
-          −
+          <Minus size={18} />
         </button>
         <button className="zoom-btn zoom-btn-control" onClick={handleResetZoom} title="Reset Zoom">
-          ⌂
+          <House size={18} />
         </button>
         <button className="zoom-btn zoom-btn-control" onClick={handleZoomIn} title="Zoom In">
-          +
+          <Plus size={18} />
         </button>
       </div>
 

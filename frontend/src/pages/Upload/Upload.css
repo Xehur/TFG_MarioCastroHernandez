@@ -1,7 +1,10 @@
 .upload-page {
   min-height: 100vh;
-  background: #0a0a0a;
-  color: white;
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(120, 60, 130, 0.35), transparent),
+    linear-gradient(135deg, #14101f 0%, #221335 45%, #3a1a4d 100%);
+  background-attachment: fixed;
+  color: #fff;
   padding: 40px 20px;
 }
 
@@ -17,8 +20,15 @@
 .upload-title h1 {
   margin: 0 0 8px 0;
   font-size: 32px;
-  font-weight: 700;
-  color: white;
+  font-weight: 800;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.upload-title h1 .lucide {
+  color: #cf8fd8;
 }
 
 .upload-title p {
@@ -28,20 +38,24 @@
 }
 
 .view-images-btn {
-  padding: 12px 24px;
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 22px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
 }
 
 .view-images-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(178, 69, 146, 0.2);
+  border-color: #b24592;
   transform: translateY(-2px);
 }
 
@@ -59,17 +73,25 @@
 }
 
 .info-card {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
   padding: 24px;
+  backdrop-filter: blur(4px);
 }
 
 .info-card h3 {
   margin: 0 0 16px 0;
   font-size: 18px;
-  font-weight: 600;
-  color: white;
+  font-weight: 700;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-card h3 .lucide {
+  color: #cf8fd8;
 }
 
 .info-card ul {
@@ -90,7 +112,7 @@
   content: '•';
   position: absolute;
   left: -12px;
-  color: #4ade80;
+  color: #cf8fd8;
   font-weight: bold;
 }
 

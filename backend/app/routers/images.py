@@ -13,9 +13,11 @@ from PIL import Image as PILImage
 from app.config import settings
 from app.db import SessionLocal
 from app.models.image import Image
+from app.models.user import User
 from app.schemas.image import ImageResponse, ImageUploadResult, MultipleUploadResponse
 from app.services.wsi.openslide_service import OpenSlideService
 from app.services.wsi.slide_cache import slide_cache
+from app.core.deps import get_current_user
 
 router = APIRouter(
     prefix="/images",
@@ -87,17 +89,17 @@ def save_upload_file(upload_file: UploadFile, destination: str) -> int:
 @router.post("/upload", response_model=ImageResponse, status_code=status.HTTP_201_CREATED)
 async def upload_image(
     file: UploadFile = File(...),
-    user_id: int = 1,  # Por ahora hardcodeado, luego vendrá del auth
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Sube una imagen WSI al servidor
-    
+
     Args:
         file: Archivo a subir
-        user_id: ID del usuario (temporal)
         db: Sesión de base de datos
-        
+        current_user: Usuario autenticado (propietario de la imagen)
+
     Returns:
         Información de la imagen subida
     """
@@ -145,7 +147,7 @@ async def upload_image(
         db_image = Image(
             filename=file.filename,
             file_path=file_path,
-            user_id=user_id,
+            user_id=current_user.id,
             width=width,
             height=height,
             level_count=metadata['level_count'],
@@ -179,27 +181,36 @@ async def upload_image(
 async def list_images(
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Lista todas las imágenes subidas
-    
+    Lista las imágenes subidas por el usuario autenticado
+
     Args:
         skip: Número de registros a saltar (paginación)
         limit: Número máximo de registros a retornar
         db: Sesión de base de datos
-        
+        current_user: Usuario autenticado
+
     Returns:
-        Lista de imágenes
+        Lista de imágenes del usuario
     """
-    images = db.query(Image).offset(skip).limit(limit).all()
+    images = (
+        db.query(Image)
+        .filter(Image.user_id == current_user.id)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
     return images
 
 
 @router.get("/{image_id}", response_model=ImageResponse)
 async def get_image(
     image_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Obtiene información de una imagen específica
@@ -207,6 +218,7 @@ async def get_image(
     Args:
         image_id: ID de la imagen
         db: Sesión de base de datos
+        current_user: Usuario autenticado
         
     Returns:
         Información de la imagen
@@ -331,20 +343,20 @@ def process_single_file(file: UploadFile, user_id: int, db: Session) -> ImageUpl
 @router.post("/upload-multiple", response_model=MultipleUploadResponse, status_code=status.HTTP_207_MULTI_STATUS)
 async def upload_multiple_images(
     files: List[UploadFile] = File(...),
-    user_id: int = 1,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Sube múltiples imágenes WSI al servidor (soporte para drag & drop)
-    
+
     Args:
         files: Lista de archivos a subir
-        user_id: ID del usuario (temporal)
         db: Sesión de base de datos
-        
+        current_user: Usuario autenticado (propietario de las imágenes)
+
     Returns:
         Resultado del procesamiento de cada archivo
-        
+
     Status Code:
         207 Multi-Status: Algunos archivos pueden tener éxito y otros fallar
     """
@@ -363,7 +375,7 @@ async def upload_multiple_images(
     # Procesar cada archivo
     for file in files:
         logger.info(f"Procesando archivo: {file.filename}")
-        result = process_single_file(file, user_id, db)
+        result = process_single_file(file, current_user.id, db)
         results.append(result)
         
         if result.success:
@@ -384,7 +396,8 @@ async def upload_multiple_images(
 @router.get("/{image_id}/dzi.dzi")
 async def get_dzi_metadata(
     image_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Obtiene el archivo DZI (Deep Zoom Image) con metadatos para OpenSeadragon.
@@ -437,7 +450,8 @@ async def get_tile(
     level: int,
     col: int,
     row: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Obtiene un tile específico de la imagen WSI para OpenSeadragon.

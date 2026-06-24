@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { imageService } from '../../services/imageService';
 import { formatFileSize, formatDate } from '../../utils/helpers';
+import UserMenu from '../../components/auth/UserMenu';
 import './ImageList.css';
 
 /**
@@ -79,9 +80,12 @@ const ImageList = () => {
           <h1>📋 Imágenes WSI</h1>
           <p>{images.length} imagen(es) disponible(s)</p>
         </div>
-        <button className="upload-btn" onClick={handleUploadNew}>
-          ➕ Subir nueva imagen
-        </button>
+        <div className="header-actions">
+          <button className="upload-btn" onClick={handleUploadNew}>
+            ➕ Subir nueva imagen
+          </button>
+          <UserMenu />
+        </div>
       </div>
 
       {images.length === 0 ? (

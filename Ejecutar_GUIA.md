@@ -14,7 +14,7 @@ y probar la aplicación en local.
 ## 1. Backend (puerto 8000)
 
 Abre una terminal:
-
+pip install -r requirements.txt (SETUP)
 ```powershell
 cd C:\Users\pocom\Projecto_TFG\backend
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

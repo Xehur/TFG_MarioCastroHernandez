@@ -61,6 +61,37 @@
   opacity: 0.9;
 }
 
+.palette-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.palette-open-btn:hover {
+  background: rgba(178, 69, 146, 0.2);
+  border-color: #b24592;
+}
+
+.palette-kbd {
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(178, 69, 146, 0.25);
+  border: 1px solid rgba(178, 69, 146, 0.35);
+  color: #e8e0f0;
+  font-size: 11px;
+  font-family: inherit;
+}
+
 .image-info {
   flex: 1;
 }

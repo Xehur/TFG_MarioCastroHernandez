@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { createRef } from 'react';
 
 vi.mock('../../../services/densityService', () => ({
   densityService: {
@@ -196,5 +197,39 @@ describe('DensityMapViewer', () => {
         force: true,
       })
     );
+  });
+
+  it('muestra el mapa al invocar show() desde la ref (paleta de comandos)', async () => {
+    const viewer = makeViewer();
+    const ref = createRef();
+    render(<DensityMapViewer ref={ref} viewer={viewer} imageId={1} />);
+
+    await act(async () => {
+      ref.current.show();
+    });
+
+    await waitFor(() =>
+      expect(densityService.getMapObjectUrl).toHaveBeenCalled()
+    );
+    expect(viewer.addSimpleImage).toHaveBeenCalled();
+    expect(await screen.findByText('Ocultar')).toBeInTheDocument();
+  });
+
+  it('alterna el mapa al invocar toggle() desde la ref', async () => {
+    const viewer = makeViewer();
+    const ref = createRef();
+    render(<DensityMapViewer ref={ref} viewer={viewer} imageId={1} />);
+
+    await act(async () => {
+      ref.current.toggle();
+    });
+    expect(await screen.findByText('Ocultar')).toBeInTheDocument();
+    expect(viewer.addSimpleImage).toHaveBeenCalled();
+
+    await act(async () => {
+      ref.current.toggle();
+    });
+    expect(await screen.findByText('Mostrar')).toBeInTheDocument();
+    expect(viewer.world.removeItem).toHaveBeenCalledWith(viewer.item);
   });
 });

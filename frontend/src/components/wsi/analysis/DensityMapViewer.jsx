@@ -1,4 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+} from 'react';
 import { Grid3x3, Eye, EyeOff, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import OpenSeadragon from 'openseadragon';
 import { densityService } from '../../../services/densityService';
@@ -24,8 +31,12 @@ const COLORMAP_OPTIONS = ['viridis', 'hot', 'magma', 'plasma', 'inferno', 'jet']
  * Props:
  * - viewer: instancia de OpenSeadragon (o null si aún no está lista)
  * - imageId: id de la imagen
+ *
+ * Ref imperativa (para la paleta de comandos):
+ * - toggle(): alterna la visibilidad del mapa.
+ * - show(): fuerza que el mapa se muestre.
  */
-const DensityMapViewer = ({ viewer, imageId }) => {
+const DensityMapViewer = forwardRef(({ viewer, imageId }, ref) => {
   const [enabled, setEnabled] = useState(false);
   const [opacity, setOpacity] = useState(0.6);
   const [gridSize, setGridSize] = useState(256);
@@ -160,6 +171,30 @@ const DensityMapViewer = ({ viewer, imageId }) => {
       destroyTracker();
     }
   };
+
+  // Permite alternar el mapa desde fuera (p. ej. la paleta de comandos).
+  const toggleRef = useRef(handleToggle);
+  toggleRef.current = handleToggle;
+
+  // Fuerza que el mapa se muestre (tras generarlo desde la paleta).
+  const ensureShown = useCallback(() => {
+    setEnabled(true);
+    load();
+  }, [load]);
+  const showRef = useRef(ensureShown);
+  showRef.current = ensureShown;
+
+  // Expone métodos imperativos estables que invocan siempre el último
+  // manejador; la paleta de comandos los llama directamente y de forma
+  // síncrona, sin depender de efectos ni de re-renders del contenedor.
+  useImperativeHandle(
+    ref,
+    () => ({
+      toggle: () => toggleRef.current(),
+      show: () => showRef.current(),
+    }),
+    []
+  );
 
   const handleOpacityChange = value => {
     setOpacity(value);
@@ -305,6 +340,8 @@ const DensityMapViewer = ({ viewer, imageId }) => {
       )}
     </div>
   );
-};
+});
+
+DensityMapViewer.displayName = 'DensityMapViewer';
 
 export default DensityMapViewer;

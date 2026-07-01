@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { createRef } from 'react';
 
 vi.mock('../../../services/tissueService', () => ({
   tissueService: {
@@ -97,5 +98,39 @@ describe('TissueMaskControl', () => {
 
     fireEvent.click(screen.getByText(/Re-analizar/));
     await waitFor(() => expect(tissueService.analyze).toHaveBeenCalledWith(1));
+  });
+
+  it('muestra la máscara al invocar show() desde la ref (paleta de comandos)', async () => {
+    const viewer = makeViewer();
+    const ref = createRef();
+    render(<TissueMaskControl ref={ref} viewer={viewer} imageId={1} />);
+
+    await act(async () => {
+      ref.current.show();
+    });
+
+    await waitFor(() =>
+      expect(tissueService.getMaskObjectUrl).toHaveBeenCalledWith(1)
+    );
+    expect(viewer.addSimpleImage).toHaveBeenCalled();
+    expect(await screen.findByText('Ocultar')).toBeInTheDocument();
+  });
+
+  it('alterna la máscara al invocar toggle() desde la ref', async () => {
+    const viewer = makeViewer();
+    const ref = createRef();
+    render(<TissueMaskControl ref={ref} viewer={viewer} imageId={1} />);
+
+    await act(async () => {
+      ref.current.toggle();
+    });
+    expect(await screen.findByText('Ocultar')).toBeInTheDocument();
+    expect(viewer.addSimpleImage).toHaveBeenCalled();
+
+    await act(async () => {
+      ref.current.toggle();
+    });
+    expect(await screen.findByText('Mostrar')).toBeInTheDocument();
+    expect(viewer.world.removeItem).toHaveBeenCalledWith(viewer.item);
   });
 });

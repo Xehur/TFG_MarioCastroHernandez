@@ -28,3 +28,16 @@ class AnalysisResultResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class DensityMapResponse(BaseModel):
+    """Respuesta de un mapa de densidades (matriz + metadatos)."""
+    id: int
+    image_id: int
+    grid_size: int
+    density_data: Dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

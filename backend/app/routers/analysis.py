@@ -5,6 +5,9 @@ Endpoints:
 - GET /images/{image_id}/tissue-mask         PNG de la máscara de tejido (overlay)
 - GET /images/{image_id}/tissue-mask/stats   estadísticas del análisis (JSON)
 - POST /images/{image_id}/analyze/tissue     fuerza el (re)análisis de tejido
+- GET /images/{image_id}/density-map         PNG del heatmap de densidad
+- GET /images/{image_id}/density-map/stats   matriz de densidad + metadatos (JSON)
+- POST /images/{image_id}/analyze/density    fuerza la (re)generación del mapa
 """
 import os
 import logging
@@ -15,8 +18,12 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_db, get_current_user
 from app.models.user import User
 from app.models.image import Image
-from app.schemas.analysis import AnalysisResultResponse
-from app.services.analysis import tissue_service
+from app.schemas.analysis import AnalysisResultResponse, DensityMapResponse
+from app.services.analysis import tissue_service, density_service
+from app.services.analysis.density_generation import (
+    SUPPORTED_COLORMAPS,
+    DEFAULT_COLORMAP,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -122,3 +129,122 @@ def analyze_tissue(
             status_code=500, detail=f"Error en análisis de tejido: {exc}"
         )
     return analysis
+
+
+# --- Mapa de densidades (issues 31, 33) --------------------------------------
+
+_MIN_GRID_SIZE = 16
+_MAX_GRID_SIZE = 8192
+
+
+def _validate_density_params(grid_size: int, colormap: str) -> None:
+    if grid_size < _MIN_GRID_SIZE or grid_size > _MAX_GRID_SIZE:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"grid_size debe estar entre {_MIN_GRID_SIZE} y {_MAX_GRID_SIZE}"
+            ),
+        )
+    if colormap not in SUPPORTED_COLORMAPS:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"colormap no soportado. Opciones: {', '.join(SUPPORTED_COLORMAPS)}"
+            ),
+        )
+
+
+@router.get("/images/{image_id}/density-map")
+def get_density_map(
+    image_id: int,
+    grid_size: int = density_service.DEFAULT_GRID_SIZE,
+    colormap: str = DEFAULT_COLORMAP,
+    force: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Devuelve el PNG (RGBA) del heatmap de densidad. Lo genera si no existe."""
+    _validate_density_params(grid_size, colormap)
+    image = _get_image_or_404(db, image_id)
+    _ensure_file_exists(image)
+
+    try:
+        density_map = density_service.get_or_create_density(
+            db, image_id, image.file_path, grid_size, colormap, force=force
+        )
+        png_bytes = density_service.load_heatmap_png_bytes(density_map)
+    except FileNotFoundError:
+        density_map = density_service.generate_density(
+            db, image_id, image.file_path, grid_size, colormap
+        )
+        png_bytes = density_service.load_heatmap_png_bytes(density_map)
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"Error generando mapa de densidad: {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generando mapa de densidad: {exc}",
+        )
+
+    return Response(
+        content=png_bytes,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+@router.get(
+    "/images/{image_id}/density-map/stats",
+    response_model=DensityMapResponse,
+)
+def get_density_map_stats(
+    image_id: int,
+    grid_size: int = density_service.DEFAULT_GRID_SIZE,
+    colormap: str = DEFAULT_COLORMAP,
+    force: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Devuelve la matriz de densidades y sus metadatos (JSON)."""
+    _validate_density_params(grid_size, colormap)
+    image = _get_image_or_404(db, image_id)
+    _ensure_file_exists(image)
+
+    try:
+        density_map = density_service.get_or_create_density(
+            db, image_id, image.file_path, grid_size, colormap, force=force
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"Error en mapa de densidad: {exc}")
+        raise HTTPException(
+            status_code=500, detail=f"Error en mapa de densidad: {exc}"
+        )
+    return density_map
+
+
+@router.post(
+    "/images/{image_id}/analyze/density",
+    response_model=DensityMapResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def analyze_density(
+    image_id: int,
+    grid_size: int = density_service.DEFAULT_GRID_SIZE,
+    colormap: str = DEFAULT_COLORMAP,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Fuerza la (re)generación del mapa de densidades y devuelve los datos."""
+    _validate_density_params(grid_size, colormap)
+    image = _get_image_or_404(db, image_id)
+    _ensure_file_exists(image)
+
+    try:
+        density_map = density_service.generate_density(
+            db, image_id, image.file_path, grid_size, colormap
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"Error en mapa de densidad: {exc}")
+        raise HTTPException(
+            status_code=500, detail=f"Error en mapa de densidad: {exc}"
+        )
+    return density_map

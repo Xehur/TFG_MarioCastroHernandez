@@ -58,6 +58,10 @@ class DensityMapResult:
     def density_mean(self) -> float:
         return float(self.density.mean()) if self.density.size else 0.0
 
+    @property
+    def density_std(self) -> float:
+        return float(self.density.std()) if self.density.size else 0.0
+
     def stats(self) -> Dict[str, Any]:
         """Datos serializables (con la matriz) para guardar en BD."""
         return {
@@ -70,6 +74,7 @@ class DensityMapResult:
             "density_min": round(self.density_min, 6),
             "density_max": round(self.density_max, 6),
             "density_mean": round(self.density_mean, 6),
+            "density_std": round(self.density_std, 6),
             "matrix": np.round(self.density, 6).tolist(),
             **self.extra,
         }

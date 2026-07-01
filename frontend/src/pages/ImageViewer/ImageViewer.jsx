@@ -11,7 +11,7 @@ import {
   useAnnotations,
   centerOnAnnotation,
 } from '../../components/wsi/annotations';
-import { TissueMaskControl, DensityMapViewer } from '../../components/wsi/analysis';
+import { TissueMaskControl, DensityMapViewer, AnalysisResultsPanel } from '../../components/wsi/analysis';
 import { imageService } from '../../services/imageService';
 import { annotationService } from '../../services/annotationService';
 import config from '../../config/config';
@@ -213,6 +213,7 @@ const ImageViewer = () => {
         </div>
 
         <div className="viewer-side-panel">
+          <AnalysisResultsPanel imageId={numericId} />
           <TissueMaskControl viewer={viewer} imageId={numericId} />
           <DensityMapViewer viewer={viewer} imageId={numericId} />
           <AnnotationPanel

@@ -8,6 +8,8 @@ Endpoints:
 - GET /images/{image_id}/density-map         PNG del heatmap de densidad
 - GET /images/{image_id}/density-map/stats   matriz de densidad + metadatos (JSON)
 - POST /images/{image_id}/analyze/density    fuerza la (re)generación del mapa
+- POST /images/{image_id}/analyze            análisis consolidado (tejido + densidad)
+- GET /images/{image_id}/analysis            último análisis consolidado (JSON)
 """
 import os
 import logging
@@ -18,8 +20,12 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_db, get_current_user
 from app.models.user import User
 from app.models.image import Image
-from app.schemas.analysis import AnalysisResultResponse, DensityMapResponse
-from app.services.analysis import tissue_service, density_service
+from app.schemas.analysis import (
+    AnalysisResultResponse,
+    DensityMapResponse,
+    FullAnalysisResponse,
+)
+from app.services.analysis import tissue_service, density_service, analysis_service
 from app.services.analysis.density_generation import (
     SUPPORTED_COLORMAPS,
     DEFAULT_COLORMAP,
@@ -248,3 +254,53 @@ def analyze_density(
             status_code=500, detail=f"Error en mapa de densidad: {exc}"
         )
     return density_map
+
+
+# --- Análisis consolidado en tiempo real (issue 37) --------------------------
+
+@router.post(
+    "/images/{image_id}/analyze",
+    response_model=FullAnalysisResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def analyze_image(
+    image_id: int,
+    grid_size: int = density_service.DEFAULT_GRID_SIZE,
+    colormap: str = DEFAULT_COLORMAP,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Ejecuta el análisis completo (tejido + densidad) y guarda el resumen."""
+    _validate_density_params(grid_size, colormap)
+    image = _get_image_or_404(db, image_id)
+    _ensure_file_exists(image)
+
+    try:
+        analysis = analysis_service.run_full_analysis(
+            db, image_id, image.file_path, grid_size, colormap
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"Error en análisis consolidado: {exc}")
+        raise HTTPException(
+            status_code=500, detail=f"Error en análisis consolidado: {exc}"
+        )
+    return analysis
+
+
+@router.get(
+    "/images/{image_id}/analysis",
+    response_model=FullAnalysisResponse,
+)
+def get_analysis(
+    image_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Devuelve el último análisis consolidado de la imagen (404 si no existe)."""
+    _get_image_or_404(db, image_id)
+    analysis = analysis_service.get_full_analysis(db, image_id)
+    if analysis is None:
+        raise HTTPException(
+            status_code=404, detail="La imagen no tiene análisis todavía"
+        )
+    return analysis

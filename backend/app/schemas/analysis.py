@@ -54,3 +54,15 @@ class FullAnalysisResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class AnalyticsResponse(BaseModel):
+    """Conjunto de datos de analíticas listos para gráficas y tablas."""
+    image_id: int
+    total_annotations: int
+    by_type: list
+    by_class: list
+    distribution: list
+    spatial: Dict[str, Any]
+    tissue: Optional[Dict[str, Any]] = None
+    density_zones: Optional[Dict[str, Any]] = None

@@ -41,6 +41,26 @@
   border-color: #b24592;
 }
 
+.analytics-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #8e2de2 0%, #b24592 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+}
+
+.analytics-open-btn:hover {
+  opacity: 0.9;
+}
+
 .image-info {
   flex: 1;
 }

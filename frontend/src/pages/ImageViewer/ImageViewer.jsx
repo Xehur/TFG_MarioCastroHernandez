@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { AlertCircle, ArrowLeft, Ruler, Layers, HardDrive } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowLeft,
+  Ruler,
+  Layers,
+  HardDrive,
+  BarChart3,
+} from 'lucide-react';
 import { WSIViewer } from '../../components/wsi';
 import {
   AnnotationLayer,
@@ -11,7 +18,12 @@ import {
   useAnnotations,
   centerOnAnnotation,
 } from '../../components/wsi/annotations';
-import { TissueMaskControl, DensityMapViewer, AnalysisResultsPanel } from '../../components/wsi/analysis';
+import {
+  TissueMaskControl,
+  DensityMapViewer,
+  AnalysisResultsPanel,
+  AnalyticsDashboard,
+} from '../../components/wsi/analysis';
 import { imageService } from '../../services/imageService';
 import { annotationService } from '../../services/annotationService';
 import config from '../../config/config';
@@ -37,6 +49,7 @@ const ImageViewer = () => {
   const [pendingShape, setPendingShape] = useState(null);
   const [editingAnnotation, setEditingAnnotation] = useState(null);
   const [showCocoImport, setShowCocoImport] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   const {
     annotations,
@@ -179,6 +192,12 @@ const ImageViewer = () => {
             </span>
           </div>
         </div>
+        <button
+          className="analytics-open-btn"
+          onClick={() => setShowAnalytics(true)}
+        >
+          <BarChart3 size={16} /> Dashboard
+        </button>
       </header>
 
       <AnnotationToolbar
@@ -235,6 +254,13 @@ const ImageViewer = () => {
         <CocoImportModal
           onImport={importCoco}
           onClose={() => setShowCocoImport(false)}
+        />
+      )}
+
+      {showAnalytics && (
+        <AnalyticsDashboard
+          imageId={numericId}
+          onClose={() => setShowAnalytics(false)}
         />
       )}
 

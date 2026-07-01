@@ -10,6 +10,7 @@ Endpoints:
 - POST /images/{image_id}/analyze/density    fuerza la (re)generación del mapa
 - POST /images/{image_id}/analyze            análisis consolidado (tejido + densidad)
 - GET /images/{image_id}/analysis            último análisis consolidado (JSON)
+- GET /images/{image_id}/analytics           datos para gráficas y tablas (JSON)
 """
 import os
 import logging
@@ -24,8 +25,14 @@ from app.schemas.analysis import (
     AnalysisResultResponse,
     DensityMapResponse,
     FullAnalysisResponse,
+    AnalyticsResponse,
 )
-from app.services.analysis import tissue_service, density_service, analysis_service
+from app.services.analysis import (
+    tissue_service,
+    density_service,
+    analysis_service,
+    analytics_service,
+)
 from app.services.analysis.density_generation import (
     SUPPORTED_COLORMAPS,
     DEFAULT_COLORMAP,
@@ -304,3 +311,36 @@ def get_analysis(
             status_code=404, detail="La imagen no tiene análisis todavía"
         )
     return analysis
+
+
+# --- Analíticas (issue 46) ---------------------------------------------------
+
+@router.get(
+    "/images/{image_id}/analytics",
+    response_model=AnalyticsResponse,
+)
+def get_analytics(
+    image_id: int,
+    spatial_bins: int = analytics_service.DEFAULT_SPATIAL_BINS,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Devuelve datos de analíticas (distribución, espacial, tejido, densidad)."""
+    if spatial_bins < 2 or spatial_bins > 100:
+        raise HTTPException(
+            status_code=422, detail="spatial_bins debe estar entre 2 y 100"
+        )
+    image = _get_image_or_404(db, image_id)
+    try:
+        return analytics_service.build_analytics(
+            db,
+            image_id,
+            width=image.width or 0,
+            height=image.height or 0,
+            spatial_bins=spatial_bins,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"Error generando analíticas: {exc}")
+        raise HTTPException(
+            status_code=500, detail=f"Error generando analíticas: {exc}"
+        )

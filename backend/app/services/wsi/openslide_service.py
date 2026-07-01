@@ -129,6 +129,30 @@ class OpenSlideService:
             'properties': dict(self.slide.properties)
         }
 
+    def get_thumbnail_rgb(self, max_size: int = 2048):
+        """
+        Obtiene una miniatura RGB de la imagen como array numpy (H, W, 3).
+
+        Se usa para análisis a baja resolución (detección de tejido, mapas de
+        densidad), evitando cargar la imagen completa en memoria.
+
+        Args:
+            max_size: lado máximo (px) de la miniatura.
+
+        Returns:
+            (array numpy uint8 RGB, escala) donde escala = tamaño_base / tamaño_thumb
+        """
+        import numpy as np
+
+        width, height = self.slide.dimensions
+        thumb = self.slide.get_thumbnail((max_size, max_size))
+        if thumb.mode != "RGB":
+            thumb = thumb.convert("RGB")
+        arr = np.asarray(thumb, dtype=np.uint8)
+        thumb_h = arr.shape[0]
+        scale = height / thumb_h if thumb_h else 1.0
+        return arr, scale
+
     def close(self) -> None:
         """Cierra la imagen."""
         if self.slide:

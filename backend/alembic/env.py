@@ -15,6 +15,7 @@ from app.db import Base
 from app.models.user import User
 from app.models.image import Image
 from app.models.annotation import Annotation, AnnotationClass
+from app.models.analysis import AnalysisResult, DensityMap
 
 config = context.config
 

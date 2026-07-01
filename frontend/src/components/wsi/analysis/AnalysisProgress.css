@@ -1,0 +1,82 @@
+.analysis-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.analysis-progress-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.analysis-progress-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #d8c6ec;
+}
+
+.analysis-progress-pct {
+  font-size: 14px;
+  font-weight: 700;
+  color: #cf8fd8;
+}
+
+.analysis-progress-bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 6px;
+  background: rgba(142, 45, 226, 0.15);
+  overflow: hidden;
+}
+
+.analysis-progress-fill {
+  height: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #8e2de2 0%, #b24592 100%);
+  transition: width 0.2s ease;
+}
+
+.analysis-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #b9a8cc;
+}
+
+.analysis-progress-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.analysis-progress-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 107, 157, 0.4);
+  border-radius: 7px;
+  background: transparent;
+  color: #ff6b9d;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.analysis-progress-cancel:hover {
+  background: rgba(255, 107, 157, 0.12);
+}
+
+.analysis-spin {
+  animation: analysis-spin 0.8s linear infinite;
+}
+
+@keyframes analysis-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

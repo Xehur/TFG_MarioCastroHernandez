@@ -41,3 +41,16 @@ class DensityMapResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class FullAnalysisResponse(BaseModel):
+    """Respuesta del análisis consolidado (tejido + densidad)."""
+    id: int
+    image_id: int
+    analysis_type: str
+    result_data: Dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

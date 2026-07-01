@@ -9,6 +9,7 @@ vi.mock('../../../services/annotationService', () => ({
     update: vi.fn(),
     remove: vi.fn(),
     createClass: vi.fn(),
+    importCoco: vi.fn(),
   },
 }));
 
@@ -71,6 +72,32 @@ describe('useAnnotations', () => {
       await result.current.createClass({ name: 'Necrosis', color: '#0f0' });
     });
     expect(result.current.classes).toHaveLength(2);
+  });
+
+  it('importCoco importa y recarga las anotaciones', async () => {
+    annotationService.importCoco.mockResolvedValue({
+      imported: 2,
+      created_classes: ['Necrosis'],
+    });
+    const { result } = renderHook(() => useAnnotations(5));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    annotationService.list.mockResolvedValue({
+      total: 3,
+      items: [{ id: 1 }, { id: 2 }, { id: 3 }],
+    });
+
+    let res;
+    await act(async () => {
+      res = await result.current.importCoco({ images: [], annotations: [] });
+    });
+    expect(annotationService.importCoco).toHaveBeenCalledWith(
+      5,
+      { images: [], annotations: [] },
+      null
+    );
+    expect(res.imported).toBe(2);
+    expect(result.current.annotations).toHaveLength(3);
   });
 
   it('guarda el error si falla la carga', async () => {

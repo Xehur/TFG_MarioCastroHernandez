@@ -11,6 +11,16 @@ export function useAnnotations(imageId) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const reload = useCallback(async () => {
+    if (!imageId) return;
+    const [list, cls] = await Promise.all([
+      annotationService.list(imageId),
+      annotationService.listClasses(),
+    ]);
+    setAnnotations(list.items || []);
+    setClasses(cls || []);
+  }, [imageId]);
+
   useEffect(() => {
     let mounted = true;
     const load = async () => {
@@ -64,15 +74,30 @@ export function useAnnotations(imageId) {
     return created;
   }, []);
 
+  const importCoco = useCallback(
+    async (coco, categoryMapping = null) => {
+      const result = await annotationService.importCoco(
+        imageId,
+        coco,
+        categoryMapping
+      );
+      await reload();
+      return result;
+    },
+    [imageId, reload]
+  );
+
   return {
     annotations,
     classes,
     loading,
     error,
+    reload,
     createAnnotation,
     updateAnnotation,
     deleteAnnotation,
     createClass,
+    importCoco,
   };
 }
 

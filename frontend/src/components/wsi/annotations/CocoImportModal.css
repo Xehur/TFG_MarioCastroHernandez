@@ -1,0 +1,171 @@
+.coco-modal {
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.coco-modal h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.coco-modal h2 .lucide {
+  color: #8e2de2;
+}
+
+.coco-filepick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 2px dashed #c9a3e0;
+  border-radius: 10px;
+  background: #faf5ff;
+  color: #6b3fa0;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.coco-filepick:hover {
+  border-color: #8e2de2;
+  background: #f3e9fb;
+}
+
+.coco-filepick input[type='file'] {
+  display: none;
+}
+
+.coco-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  background: #fdecef;
+  border-radius: 8px;
+  color: #c1274d;
+  font-size: 13px;
+}
+
+.coco-preview {
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: 10px;
+  background: #f7f2fc;
+  border: 1px solid #e6d6f5;
+}
+
+.coco-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #4ade80;
+  font-size: 14px;
+}
+
+.coco-preview-head span {
+  color: #1c1330;
+}
+
+.coco-preview-shapes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.coco-chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #8e2de2 0%, #b24592 100%);
+  color: #fff;
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.coco-mapping {
+  margin-top: 14px;
+}
+
+.coco-mapping-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+.coco-mapping-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.coco-mapping-from {
+  flex: 1;
+  font-size: 13px;
+  color: #4a3a5e;
+}
+
+.coco-mapping-from em {
+  color: #9a86ad;
+  font-style: normal;
+}
+
+.coco-mapping-arrow {
+  color: #9333ea;
+  font-weight: 700;
+}
+
+.coco-mapping-row input[type='text'] {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid #d0d0d0;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.coco-mapping-row input[type='text']:focus {
+  outline: none;
+  border-color: #9333ea;
+  box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.15);
+}
+
+.coco-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  padding: 16px 0;
+  color: #1c1330;
+}
+
+.coco-success .lucide {
+  color: #4ade80;
+}
+
+.coco-success-classes {
+  font-size: 13px;
+  color: #6b3fa0;
+}
+
+.modal-btn-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.coco-spin {
+  animation: coco-spin 0.8s linear infinite;
+}
+
+@keyframes coco-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

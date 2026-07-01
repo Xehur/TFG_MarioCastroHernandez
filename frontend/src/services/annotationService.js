@@ -47,6 +47,21 @@ export const annotationService = {
     const response = await apiClient.delete(`/annotation-classes/${classId}`);
     return response.data;
   },
+
+  /** Descarga las anotaciones de una imagen en formato COCO JSON. */
+  exportCoco: async imageId => {
+    const response = await apiClient.get(`/images/${imageId}/export/coco`);
+    return response.data;
+  },
+
+  /** Importa anotaciones COCO en una imagen. */
+  importCoco: async (imageId, coco, categoryMapping = null) => {
+    const response = await apiClient.post(`/images/${imageId}/import/coco`, {
+      coco,
+      category_mapping: categoryMapping,
+    });
+    return response.data;
+  },
 };
 
 export default annotationService;

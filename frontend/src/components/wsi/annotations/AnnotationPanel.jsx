@@ -1,4 +1,4 @@
-import { Square, Circle, Pentagon, Crosshair, Pencil, Trash2 } from 'lucide-react';
+import { Square, Circle, Pentagon, Crosshair, Pencil, Trash2, Download, Upload } from 'lucide-react';
 import './AnnotationPanel.css';
 
 const SHAPE_ICON = { rectangle: Square, circle: Circle, polygon: Pentagon };
@@ -14,6 +14,8 @@ const SHAPE_ICON = { rectangle: Square, circle: Circle, polygon: Pentagon };
  * - onCenter(annotation): centra el visor en la anotación
  * - onEdit(annotation): abre el modal de edición (etiqueta, clase, color)
  * - onDelete(id)
+ * - onExportCoco(): exporta las anotaciones en formato COCO
+ * - onImportCoco(): abre el modal de importación COCO
  * - loading
  */
 const AnnotationPanel = ({
@@ -24,6 +26,8 @@ const AnnotationPanel = ({
   onCenter,
   onEdit,
   onDelete,
+  onExportCoco,
+  onImportCoco,
   loading,
 }) => {
   const classNameOf = id => classes.find(c => c.id === id)?.name;
@@ -33,6 +37,26 @@ const AnnotationPanel = ({
       <div className="panel-header">
         <h3>Anotaciones</h3>
         <span className="panel-count">{annotations.length}</span>
+      </div>
+
+      <div className="panel-coco-actions">
+        <button
+          type="button"
+          className="panel-coco-btn"
+          onClick={onImportCoco}
+          title="Importar anotaciones COCO"
+        >
+          <Upload size={15} /> Importar COCO
+        </button>
+        <button
+          type="button"
+          className="panel-coco-btn"
+          onClick={onExportCoco}
+          disabled={annotations.length === 0}
+          title="Exportar anotaciones COCO"
+        >
+          <Download size={15} /> Exportar COCO
+        </button>
       </div>
 
       {loading ? (

@@ -25,6 +25,7 @@ export default defineConfig({
         'src/services/densityService.js',
         'src/services/analysisService.js',
         'src/services/analyticsService.js',
+        'src/services/annotationAnalysisService.js',
         'src/services/commandService.js',
         'src/components/wsi/annotations/geometry.js',
         'src/components/wsi/annotations/useAnnotations.js',

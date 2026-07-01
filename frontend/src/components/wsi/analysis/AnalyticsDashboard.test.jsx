@@ -7,6 +7,13 @@ vi.mock('../../../services/analyticsService', () => ({
   },
 }));
 
+vi.mock('../../../services/annotationAnalysisService', () => ({
+  annotationAnalysisService: {
+    getAnalytics: vi.fn(),
+    runAnalysis: vi.fn(),
+  },
+}));
+
 // Recharts depende de ResizeObserver/SVG real; se sustituye por stubs simples.
 vi.mock('recharts', () => {
   const Stub = ({ children }) => <div>{children}</div>;
@@ -28,6 +35,7 @@ vi.mock('recharts', () => {
 });
 
 import { analyticsService } from '../../../services/analyticsService';
+import { annotationAnalysisService } from '../../../services/annotationAnalysisService';
 import AnalyticsDashboard from './AnalyticsDashboard';
 
 const DATA = {
@@ -141,5 +149,65 @@ describe('AnalyticsDashboard', () => {
     expect(
       (await screen.findAllByText(/Genera un mapa de densidades/)).length
     ).toBeGreaterThan(0);
+  });
+});
+
+describe('AnalyticsDashboard (ámbito anotación)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('usa el servicio de anotación y muestra el título de la región', async () => {
+    annotationAnalysisService.getAnalytics.mockResolvedValue({
+      ...DATA,
+      annotation_id: 42,
+      total_annotations: 0,
+    });
+    render(
+      <AnalyticsDashboard imageId={1} annotationId={42} onClose={() => {}} />
+    );
+    expect(
+      await screen.findByText('Dashboard de anotación #42')
+    ).toBeInTheDocument();
+    expect(annotationAnalysisService.getAnalytics).toHaveBeenCalledWith(42, {
+      spatialBins: 10,
+    });
+    // No debe usar el servicio de imagen.
+    expect(analyticsService.getAnalytics).not.toHaveBeenCalled();
+    // Nota informativa de región.
+    expect(
+      screen.getByText(/tratada como una imagen independiente/)
+    ).toBeInTheDocument();
+  });
+
+  it('lanza el análisis si la región aún no tiene tejido', async () => {
+    annotationAnalysisService.getAnalytics
+      .mockResolvedValueOnce({ ...DATA, tissue: null, annotation_id: 8 })
+      .mockResolvedValueOnce({ ...DATA, annotation_id: 8 });
+    annotationAnalysisService.runAnalysis.mockResolvedValue({});
+    render(
+      <AnalyticsDashboard imageId={1} annotationId={8} onClose={() => {}} />
+    );
+    await screen.findByText('Densidad de tejido por zonas');
+    await waitFor(() =>
+      expect(annotationAnalysisService.runAnalysis).toHaveBeenCalledWith(8)
+    );
+    expect(annotationAnalysisService.getAnalytics).toHaveBeenCalledTimes(2);
+  });
+
+  it('no muestra los gráficos de anotaciones (tipo/clasificación)', async () => {
+    annotationAnalysisService.getAnalytics.mockResolvedValue({
+      ...DATA,
+      annotation_id: 3,
+      total_annotations: 0,
+    });
+    render(
+      <AnalyticsDashboard imageId={1} annotationId={3} onClose={() => {}} />
+    );
+    await screen.findByText('Densidad de tejido por zonas');
+    expect(screen.queryByText('Anotaciones por tipo')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Anotaciones por clasificación')
+    ).not.toBeInTheDocument();
   });
 });

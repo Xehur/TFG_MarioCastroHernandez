@@ -1,4 +1,4 @@
-import { Square, Circle, Pentagon, Crosshair, Pencil, Trash2, Download, Upload } from 'lucide-react';
+import { Square, Circle, Pentagon, Crosshair, Pencil, Trash2, Download, Upload, BarChart3 } from 'lucide-react';
 import './AnnotationPanel.css';
 
 const SHAPE_ICON = { rectangle: Square, circle: Circle, polygon: Pentagon };
@@ -13,6 +13,7 @@ const SHAPE_ICON = { rectangle: Square, circle: Circle, polygon: Pentagon };
  * - onSelect(id)
  * - onCenter(annotation): centra el visor en la anotación
  * - onEdit(annotation): abre el modal de edición (etiqueta, clase, color)
+ * - onAnalyze(annotation): analiza la región de la anotación y abre su dashboard
  * - onDelete(id)
  * - onExportCoco(): exporta las anotaciones en formato COCO
  * - onImportCoco(): abre el modal de importación COCO
@@ -25,6 +26,7 @@ const AnnotationPanel = ({
   onSelect,
   onCenter,
   onEdit,
+  onAnalyze,
   onDelete,
   onExportCoco,
   onImportCoco,
@@ -86,6 +88,12 @@ const AnnotationPanel = ({
               <div className="item-actions" onClick={e => e.stopPropagation()}>
                 <button title="Centrar" onClick={() => onCenter(ann)}>
                   <Crosshair size={16} />
+                </button>
+                <button
+                  title="Analizar región (tejido y densidad)"
+                  onClick={() => onAnalyze(ann)}
+                >
+                  <BarChart3 size={16} />
                 </button>
                 <button title="Editar" onClick={() => onEdit(ann)}>
                   <Pencil size={16} />

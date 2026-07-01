@@ -34,6 +34,15 @@ def _analysis_dir(image_id: int) -> str:
     return path
 
 
+def load_thumbnail_rgb(file_path: str, max_size: int = _THUMBNAIL_MAX_SIZE):
+    """Lee la miniatura RGB de una imagen (abre y cierra el slide)."""
+    slide = OpenSlideService(file_path)
+    try:
+        return slide.get_thumbnail_rgb(max_size=max_size)
+    finally:
+        slide.close()
+
+
 def _mask_png_path(image_id: int) -> str:
     return os.path.join(_analysis_dir(image_id), "tissue_mask.png")
 
@@ -44,6 +53,7 @@ def get_cached_result(db: Session, image_id: int) -> Optional[AnalysisResult]:
         db.query(AnalysisResult)
         .filter(
             AnalysisResult.image_id == image_id,
+            AnalysisResult.annotation_id.is_(None),
             AnalysisResult.analysis_type == TISSUE_ANALYSIS_TYPE,
         )
         .order_by(AnalysisResult.created_at.desc())
@@ -56,18 +66,27 @@ def generate_tissue_mask(
     image_id: int,
     file_path: str,
     max_size: int = _THUMBNAIL_MAX_SIZE,
+    *,
+    rgb=None,
+    scale: Optional[float] = None,
+    tissue=None,
 ) -> AnalysisResult:
     """
     Ejecuta la detección de tejido, guarda el PNG de overlay en disco y
     persiste (o actualiza) el AnalysisResult con las métricas.
-    """
-    slide = OpenSlideService(file_path)
-    try:
-        rgb, scale = slide.get_thumbnail_rgb(max_size=max_size)
-    finally:
-        slide.close()
 
-    result = detect_tissue(rgb)
+    ``rgb``/``scale``/``tissue`` opcionales permiten reutilizar una miniatura y
+    una detección ya calculadas (p.ej. en el análisis consolidado), evitando
+    releer la imagen y recomputar la detección.
+    """
+    if rgb is None or scale is None:
+        slide = OpenSlideService(file_path)
+        try:
+            rgb, scale = slide.get_thumbnail_rgb(max_size=max_size)
+        finally:
+            slide.close()
+
+    result = tissue if tissue is not None else detect_tissue(rgb)
 
     overlay = mask_to_rgba_overlay(result.mask)
     png_path = _mask_png_path(image_id)

@@ -27,6 +27,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { analyticsService } from '../../../services/analyticsService';
+import { annotationAnalysisService } from '../../../services/annotationAnalysisService';
 import './AnalyticsDashboard.css';
 
 const CHART_COLORS = [
@@ -168,14 +169,19 @@ const SpatialHeatmap = ({ spatial }) => {
  * cada gráfica a PNG/SVG.
  *
  * Props:
- * - imageId: id de la imagen
+ * - imageId: id de la imagen (analíticas de la imagen completa)
+ * - annotationId: si se indica, muestra las analíticas de esa anotación
+ *   (zona marcada) "como si fuese una WSI aparte". Tiene prioridad sobre
+ *   imageId para la fuente de datos.
  * - onClose(): cierra el dashboard
  */
-const AnalyticsDashboard = ({ imageId, onClose }) => {
+const AnalyticsDashboard = ({ imageId, annotationId, onClose }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [spatialBins, setSpatialBins] = useState(10);
+
+  const isAnnotation = annotationId != null;
 
   const typeRef = useRef(null);
   const classRef = useRef(null);
@@ -186,10 +192,25 @@ const AnalyticsDashboard = ({ imageId, onClose }) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await analyticsService.getAnalytics(imageId, {
-        spatialBins,
-      });
-      setData(result);
+      if (isAnnotation) {
+        let result = await annotationAnalysisService.getAnalytics(
+          annotationId,
+          { spatialBins }
+        );
+        // Si la región aún no tiene análisis, lánzalo y vuelve a pedir.
+        if (!result.tissue) {
+          await annotationAnalysisService.runAnalysis(annotationId);
+          result = await annotationAnalysisService.getAnalytics(annotationId, {
+            spatialBins,
+          });
+        }
+        setData(result);
+      } else {
+        const result = await analyticsService.getAnalytics(imageId, {
+          spatialBins,
+        });
+        setData(result);
+      }
     } catch (err) {
       setError(
         err.response?.data?.detail ||
@@ -199,7 +220,7 @@ const AnalyticsDashboard = ({ imageId, onClose }) => {
     } finally {
       setLoading(false);
     }
-  }, [imageId, spatialBins]);
+  }, [imageId, annotationId, isAnnotation, spatialBins]);
 
   useEffect(() => {
     load();
@@ -230,7 +251,10 @@ const AnalyticsDashboard = ({ imageId, onClose }) => {
       >
         <div className="analytics-modal-head">
           <h2>
-            <BarChart3 size={20} /> Dashboard de análisis
+            <BarChart3 size={20} />{' '}
+            {isAnnotation
+              ? `Dashboard de anotación #${annotationId}`
+              : 'Dashboard de análisis'}
           </h2>
           <div className="analytics-controls">
             <label className="analytics-filter">
@@ -279,6 +303,14 @@ const AnalyticsDashboard = ({ imageId, onClose }) => {
 
         {!loading && !error && data && (
           <div className="analytics-body">
+            {isAnnotation && (
+              <p className="analytics-caption analytics-region-note">
+                Análisis de la región marcada (anotación #{annotationId})
+                tratada como una imagen independiente. Las gráficas de
+                anotaciones no aplican aquí; céntrate en el tejido y la densidad
+                por zonas.
+              </p>
+            )}
             <div className="analytics-summary">
               <div className="analytics-stat">
                 <span className="analytics-stat-value">
@@ -303,54 +335,57 @@ const AnalyticsDashboard = ({ imageId, onClose }) => {
             </div>
 
             <div className="analytics-grid">
-              <ChartCard
-                icon={BarChart3}
-                title="Anotaciones por tipo"
-                exportName="anotaciones-por-tipo"
-                chartRef={typeRef}
-              >
-                {data.by_type?.length ? (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={data.by_type}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                      <XAxis dataKey="type" fontSize={12} />
-                      <YAxis allowDecimals={false} fontSize={12} />
-                      <Tooltip />
-                      <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                        {data.by_type.map((_, i) => (
-                          <Cell
-                            key={i}
-                            fill={CHART_COLORS[i % CHART_COLORS.length]}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <p className="analytics-empty">Sin anotaciones.</p>
-                )}
-              </ChartCard>
+              {!isAnnotation && (
+                <ChartCard
+                  icon={BarChart3}
+                  title="Anotaciones por tipo"
+                  exportName="anotaciones-por-tipo"
+                  chartRef={typeRef}
+                >
+                  {data.by_type?.length ? (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={data.by_type}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                        <XAxis dataKey="type" fontSize={12} />
+                        <YAxis allowDecimals={false} fontSize={12} />
+                        <Tooltip />
+                        <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                          {data.by_type.map((_, i) => (
+                            <Cell
+                              key={i}
+                              fill={CHART_COLORS[i % CHART_COLORS.length]}
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p className="analytics-empty">Sin anotaciones.</p>
+                  )}
+                </ChartCard>
+              )}
 
-              <ChartCard
-                icon={PieIcon}
-                title="Anotaciones por clasificación"
-                exportName="anotaciones-por-clase"
-                chartRef={classRef}
-              >
-                {data.by_class?.length ? (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <PieChart>
-                      <Pie
-                        data={data.by_class}
-                        dataKey="count"
-                        nameKey="class"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={70}
-                        label={entry => entry.class}
-                      >
-                        {data.by_class.map((entry, i) => (
-                          <Cell
+              {!isAnnotation && (
+                <ChartCard
+                  icon={PieIcon}
+                  title="Anotaciones por clasificación"
+                  exportName="anotaciones-por-clase"
+                  chartRef={classRef}
+                >
+                  {data.by_class?.length ? (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <PieChart>
+                        <Pie
+                          data={data.by_class}
+                          dataKey="count"
+                          nameKey="class"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={70}
+                          label={entry => entry.class}
+                        >
+                          {data.by_class.map((entry, i) => (
+                            <Cell
                             key={i}
                             fill={
                               entry.color || CHART_COLORS[i % CHART_COLORS.length]
@@ -365,7 +400,8 @@ const AnalyticsDashboard = ({ imageId, onClose }) => {
                 ) : (
                   <p className="analytics-empty">Sin clasificaciones.</p>
                 )}
-              </ChartCard>
+                </ChartCard>
+              )}
 
               <ChartCard
                 icon={Grid3x3}

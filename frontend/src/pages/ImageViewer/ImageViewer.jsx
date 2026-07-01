@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
@@ -7,6 +7,7 @@ import {
   Layers,
   HardDrive,
   BarChart3,
+  Command,
 } from 'lucide-react';
 import { WSIViewer } from '../../components/wsi';
 import {
@@ -23,6 +24,7 @@ import {
   DensityMapViewer,
   AnalysisResultsPanel,
   AnalyticsDashboard,
+  CommandPalette,
 } from '../../components/wsi/analysis';
 import { imageService } from '../../services/imageService';
 import { annotationService } from '../../services/annotationService';
@@ -50,6 +52,11 @@ const ImageViewer = () => {
   const [editingAnnotation, setEditingAnnotation] = useState(null);
   const [showCocoImport, setShowCocoImport] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
+
+  // Referencias imperativas a los controles de overlay, para que la paleta de
+  // comandos pueda mostrarlos/alternarlos directamente tras ejecutar un comando.
+  const tissueControlRef = useRef(null);
+  const densityControlRef = useRef(null);
 
   const {
     annotations,
@@ -151,6 +158,62 @@ const ImageViewer = () => {
     }
   }, [numericId, imageInfo]);
 
+  // Maneja los comandos de tipo frontend lanzados desde la paleta de comandos.
+  const handlePaletteCommand = useCallback(
+    command => {
+      // Comandos de servidor: mostrar el resultado recién generado en el visor.
+      switch (command.id) {
+        case 'detect-tissue':
+          tissueControlRef.current?.show();
+          return;
+        case 'generate-density-map':
+          densityControlRef.current?.show();
+          return;
+        case 'run-full-analysis':
+          tissueControlRef.current?.show();
+          densityControlRef.current?.show();
+          return;
+        default:
+          break;
+      }
+      switch (command.action) {
+        case 'navigate':
+          if (command.route) navigate(command.route);
+          break;
+        case 'open-analytics':
+          setShowAnalytics(true);
+          break;
+        case 'toggle-tissue-mask':
+          tissueControlRef.current?.toggle();
+          break;
+        case 'toggle-density-map':
+          densityControlRef.current?.toggle();
+          break;
+        case 'export-coco':
+          handleExportCoco();
+          break;
+        case 'import-coco':
+          setShowCocoImport(true);
+          break;
+        case 'tool-select':
+          setTool('select');
+          break;
+        case 'tool-rectangle':
+          setTool('rectangle');
+          break;
+        case 'tool-circle':
+          setTool('circle');
+          break;
+        case 'tool-polygon':
+          setTool('polygon');
+          break;
+        default:
+          break;
+      }
+    },
+    [navigate, handleExportCoco]
+  );
+
   if (loading) {
     return (
       <div className="image-viewer-page loading">
@@ -193,6 +256,18 @@ const ImageViewer = () => {
           </div>
         </div>
         <button
+          className="palette-open-btn"
+          onClick={() =>
+            window.dispatchEvent(
+              new KeyboardEvent('keydown', { key: 'k', ctrlKey: true })
+            )
+          }
+          title="Paleta de comandos (Ctrl+K)"
+        >
+          <Command size={16} /> Comandos
+          <kbd className="palette-kbd">Ctrl K</kbd>
+        </button>
+        <button
           className="analytics-open-btn"
           onClick={() => setShowAnalytics(true)}
         >
@@ -233,8 +308,16 @@ const ImageViewer = () => {
 
         <div className="viewer-side-panel">
           <AnalysisResultsPanel imageId={numericId} />
-          <TissueMaskControl viewer={viewer} imageId={numericId} />
-          <DensityMapViewer viewer={viewer} imageId={numericId} />
+          <TissueMaskControl
+            ref={tissueControlRef}
+            viewer={viewer}
+            imageId={numericId}
+          />
+          <DensityMapViewer
+            ref={densityControlRef}
+            viewer={viewer}
+            imageId={numericId}
+          />
           <AnnotationPanel
             annotations={annotations}
             classes={classes}
@@ -263,6 +346,11 @@ const ImageViewer = () => {
           onClose={() => setShowAnalytics(false)}
         />
       )}
+
+      <CommandPalette
+        context={{ imageId: numericId }}
+        onCommand={handlePaletteCommand}
+      />
 
       {pendingShape && (
         <ClassificationModal

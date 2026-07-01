@@ -1,4 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+} from 'react';
 import { ScanSearch, Eye, EyeOff, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { tissueService } from '../../../services/tissueService';
 import './TissueMaskControl.css';
@@ -13,8 +20,12 @@ import './TissueMaskControl.css';
  * Props:
  * - viewer: instancia de OpenSeadragon (o null si aún no está lista)
  * - imageId: id de la imagen
+ *
+ * Ref imperativa (para la paleta de comandos):
+ * - toggle(): alterna la visibilidad de la máscara.
+ * - show(): fuerza que la máscara se muestre.
  */
-const TissueMaskControl = ({ viewer, imageId }) => {
+const TissueMaskControl = forwardRef(({ viewer, imageId }, ref) => {
   const [enabled, setEnabled] = useState(false);
   const [opacity, setOpacity] = useState(0.5);
   const [loading, setLoading] = useState(false);
@@ -88,6 +99,31 @@ const TissueMaskControl = ({ viewer, imageId }) => {
       removeOverlay();
     }
   };
+
+  // Permite alternar la máscara desde fuera (p. ej. la paleta de comandos).
+  const toggleRef = useRef(handleToggle);
+  toggleRef.current = handleToggle;
+
+  // Fuerza que la máscara se muestre (tras ejecutarla desde la paleta).
+  const ensureShown = useCallback(() => {
+    setEnabled(true);
+    removeOverlay();
+    addOverlay();
+  }, [removeOverlay, addOverlay]);
+  const showRef = useRef(ensureShown);
+  showRef.current = ensureShown;
+
+  // Expone métodos imperativos estables que invocan siempre el último
+  // manejador; la paleta de comandos los llama directamente y de forma
+  // síncrona, sin depender de efectos ni de re-renders del contenedor.
+  useImperativeHandle(
+    ref,
+    () => ({
+      toggle: () => toggleRef.current(),
+      show: () => showRef.current(),
+    }),
+    []
+  );
 
   const handleOpacityChange = value => {
     setOpacity(value);
@@ -187,6 +223,8 @@ const TissueMaskControl = ({ viewer, imageId }) => {
       )}
     </div>
   );
-};
+});
+
+TissueMaskControl.displayName = 'TissueMaskControl';
 
 export default TissueMaskControl;

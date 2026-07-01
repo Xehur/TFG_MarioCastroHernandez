@@ -7,10 +7,12 @@ import {
   AnnotationToolbar,
   AnnotationPanel,
   ClassificationModal,
+  CocoImportModal,
   useAnnotations,
   centerOnAnnotation,
 } from '../../components/wsi/annotations';
 import { imageService } from '../../services/imageService';
+import { annotationService } from '../../services/annotationService';
 import config from '../../config/config';
 import './ImageViewer.css';
 
@@ -33,6 +35,7 @@ const ImageViewer = () => {
   const [selectedId, setSelectedId] = useState(null);
   const [pendingShape, setPendingShape] = useState(null);
   const [editingAnnotation, setEditingAnnotation] = useState(null);
+  const [showCocoImport, setShowCocoImport] = useState(false);
 
   const {
     annotations,
@@ -42,6 +45,7 @@ const ImageViewer = () => {
     updateAnnotation,
     deleteAnnotation,
     createClass,
+    importCoco,
   } = useAnnotations(numericId);
 
   useEffect(() => {
@@ -113,6 +117,25 @@ const ImageViewer = () => {
     },
     [deleteAnnotation]
   );
+
+  const handleExportCoco = useCallback(async () => {
+    try {
+      const coco = await annotationService.exportCoco(numericId);
+      const blob = new Blob([JSON.stringify(coco, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${imageInfo?.filename || `image_${numericId}`}_coco.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error exporting COCO:', err);
+    }
+  }, [numericId, imageInfo]);
 
   if (loading) {
     return (
@@ -196,9 +219,18 @@ const ImageViewer = () => {
           onCenter={handleCenter}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          onExportCoco={handleExportCoco}
+          onImportCoco={() => setShowCocoImport(true)}
           loading={annotationsLoading}
         />
       </div>
+
+      {showCocoImport && (
+        <CocoImportModal
+          onImport={importCoco}
+          onClose={() => setShowCocoImport(false)}
+        />
+      )}
 
       {pendingShape && (
         <ClassificationModal

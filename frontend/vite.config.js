@@ -26,6 +26,7 @@ export default defineConfig({
         'src/components/wsi/annotations/AnnotationPanel.jsx',
         'src/components/wsi/annotations/AnnotationToolbar.jsx',
         'src/components/wsi/annotations/ClassificationModal.jsx',
+        'src/components/wsi/annotations/CocoImportModal.jsx',
         'src/utils/apiError.js',
         'src/utils/helpers.js',
       ],

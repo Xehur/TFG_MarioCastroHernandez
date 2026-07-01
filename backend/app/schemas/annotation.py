@@ -101,3 +101,23 @@ class AnnotationResponse(AnnotationBase):
 class AnnotationListResponse(BaseModel):
     total: int
     items: List[AnnotationResponse]
+
+
+# --- COCO import/export ------------------------------------------------------
+
+class COCOImportRequest(BaseModel):
+    """Solicitud de importación COCO."""
+    coco: Dict[str, Any] = Field(
+        description="Documento COCO JSON completo (images, annotations, categories)."
+    )
+    category_mapping: Optional[Dict[str, str]] = Field(
+        default=None,
+        description="Renombrado opcional {nombre_categoria_coco: nombre_clase_destino}.",
+    )
+
+
+class COCOImportResponse(BaseModel):
+    """Resultado de una importación COCO."""
+    imported: int
+    created_classes: List[str]
+    items: List[AnnotationResponse]

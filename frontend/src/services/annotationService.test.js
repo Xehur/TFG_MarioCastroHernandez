@@ -68,4 +68,31 @@ describe('annotationService', () => {
     await annotationService.deleteClass(4);
     expect(apiClient.delete).toHaveBeenCalledWith('/annotation-classes/4');
   });
+
+  it('exportCoco() pide el COCO de una imagen', async () => {
+    apiClient.get.mockResolvedValue({ data: { images: [], annotations: [] } });
+    const result = await annotationService.exportCoco(8);
+    expect(apiClient.get).toHaveBeenCalledWith('/images/8/export/coco');
+    expect(result).toHaveProperty('annotations');
+  });
+
+  it('importCoco() envía el documento y el mapeo de categorías', async () => {
+    const coco = { images: [], annotations: [], categories: [] };
+    apiClient.post.mockResolvedValue({ data: { imported: 0, created_classes: [] } });
+    await annotationService.importCoco(3, coco, { cell: 'Célula' });
+    expect(apiClient.post).toHaveBeenCalledWith('/images/3/import/coco', {
+      coco,
+      category_mapping: { cell: 'Célula' },
+    });
+  });
+
+  it('importCoco() usa null como mapeo por defecto', async () => {
+    const coco = { images: [], annotations: [], categories: [] };
+    apiClient.post.mockResolvedValue({ data: { imported: 0 } });
+    await annotationService.importCoco(3, coco);
+    expect(apiClient.post).toHaveBeenCalledWith('/images/3/import/coco', {
+      coco,
+      category_mapping: null,
+    });
+  });
 });

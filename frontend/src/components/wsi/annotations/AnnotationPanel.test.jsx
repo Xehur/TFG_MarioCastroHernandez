@@ -41,25 +41,28 @@ describe('AnnotationPanel', () => {
     expect(onSelect).toHaveBeenCalledWith(1);
   });
 
-  it('llama a onCenter, onEdit y onDelete desde los botones', () => {
-    const onCenter = vi.fn();
-    const onEdit = vi.fn();
-    const onDelete = vi.fn();
+  it('llama a onExportCoco y onImportCoco desde los botones', () => {
+    const onExportCoco = vi.fn();
+    const onImportCoco = vi.fn();
     render(
       <AnnotationPanel
         annotations={annotations}
         classes={classes}
         loading={false}
-        onCenter={onCenter}
-        onEdit={onEdit}
-        onDelete={onDelete}
+        onExportCoco={onExportCoco}
+        onImportCoco={onImportCoco}
       />
     );
-    fireEvent.click(screen.getAllByTitle('Centrar')[0]);
-    fireEvent.click(screen.getAllByTitle('Editar')[0]);
-    fireEvent.click(screen.getAllByTitle('Eliminar')[0]);
-    expect(onCenter).toHaveBeenCalledWith(annotations[0]);
-    expect(onEdit).toHaveBeenCalledWith(annotations[0]);
-    expect(onDelete).toHaveBeenCalledWith(1);
+    fireEvent.click(screen.getByTitle('Importar anotaciones COCO'));
+    fireEvent.click(screen.getByTitle('Exportar anotaciones COCO'));
+    expect(onImportCoco).toHaveBeenCalled();
+    expect(onExportCoco).toHaveBeenCalled();
+  });
+
+  it('deshabilita exportar COCO cuando no hay anotaciones', () => {
+    render(
+      <AnnotationPanel annotations={[]} classes={[]} loading={false} />
+    );
+    expect(screen.getByTitle('Exportar anotaciones COCO')).toBeDisabled();
   });
 });

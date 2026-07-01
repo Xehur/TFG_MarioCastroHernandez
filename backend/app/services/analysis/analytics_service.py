@@ -123,16 +123,8 @@ def _annotation_breakdowns(
     }
 
 
-def _tissue_stats(db: Session, image_id: int) -> Optional[Dict[str, Any]]:
-    result = (
-        db.query(AnalysisResult)
-        .filter(
-            AnalysisResult.image_id == image_id,
-            AnalysisResult.analysis_type == TISSUE_ANALYSIS_TYPE,
-        )
-        .order_by(AnalysisResult.created_at.desc())
-        .first()
-    )
+def _tissue_stats_from_result(result: Optional[AnalysisResult]) -> Optional[Dict[str, Any]]:
+    """Extrae las estadísticas de tejido de un AnalysisResult (o None)."""
     if result is None:
         return None
     data = result.result_data or {}
@@ -144,15 +136,24 @@ def _tissue_stats(db: Session, image_id: int) -> Optional[Dict[str, Any]]:
     }
 
 
-def _density_zones(
-    db: Session, image_id: int, histogram_bins: int
-) -> Optional[Dict[str, Any]]:
-    density = (
-        db.query(DensityMap)
-        .filter(DensityMap.image_id == image_id)
-        .order_by(DensityMap.created_at.desc())
+def _tissue_stats(db: Session, image_id: int) -> Optional[Dict[str, Any]]:
+    result = (
+        db.query(AnalysisResult)
+        .filter(
+            AnalysisResult.image_id == image_id,
+            AnalysisResult.annotation_id.is_(None),
+            AnalysisResult.analysis_type == TISSUE_ANALYSIS_TYPE,
+        )
+        .order_by(AnalysisResult.created_at.desc())
         .first()
     )
+    return _tissue_stats_from_result(result)
+
+
+def _density_zones_from_map(
+    density: Optional[DensityMap], histogram_bins: int
+) -> Optional[Dict[str, Any]]:
+    """Calcula medias por fila/columna e histograma de un DensityMap (o None)."""
     if density is None:
         return None
     data = density.density_data or {}
@@ -189,6 +190,21 @@ def _density_zones(
         "density_std": data.get("density_std"),
         "histogram": {"edges": edges, "counts": counts},
     }
+
+
+def _density_zones(
+    db: Session, image_id: int, histogram_bins: int
+) -> Optional[Dict[str, Any]]:
+    density = (
+        db.query(DensityMap)
+        .filter(
+            DensityMap.image_id == image_id,
+            DensityMap.annotation_id.is_(None),
+        )
+        .order_by(DensityMap.created_at.desc())
+        .first()
+    )
+    return _density_zones_from_map(density, histogram_bins)
 
 
 def build_analytics(

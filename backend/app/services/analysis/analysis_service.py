@@ -15,10 +15,12 @@ from sqlalchemy.orm import Session
 from app.models.analysis import AnalysisResult
 from app.services.analysis import tissue_service, density_service
 from app.services.analysis.density_generation import DEFAULT_COLORMAP
+from app.services.analysis.tissue_detection import detect_tissue
 
 logger = logging.getLogger(__name__)
 
 FULL_ANALYSIS_TYPE = "full_analysis"
+_THUMBNAIL_MAX_SIZE = 2048
 
 
 def get_full_analysis(db: Session, image_id: int) -> Optional[AnalysisResult]:
@@ -27,6 +29,7 @@ def get_full_analysis(db: Session, image_id: int) -> Optional[AnalysisResult]:
         db.query(AnalysisResult)
         .filter(
             AnalysisResult.image_id == image_id,
+            AnalysisResult.annotation_id.is_(None),
             AnalysisResult.analysis_type == FULL_ANALYSIS_TYPE,
         )
         .order_by(AnalysisResult.created_at.desc())
@@ -70,10 +73,22 @@ def run_full_analysis(
     """
     Ejecuta el análisis completo (tejido + densidad) y persiste (o actualiza)
     el ``AnalysisResult`` consolidado. Devuelve dicho registro.
+
+    Optimización: lee la miniatura y ejecuta la detección de tejido una sola
+    vez, compartiéndolas entre el análisis de tejido y el de densidad (evita
+    releer la imagen y recomputar la detección dos veces).
     """
-    tissue = tissue_service.generate_tissue_mask(db, image_id, file_path)
+    rgb, scale = tissue_service.load_thumbnail_rgb(
+        file_path, max_size=_THUMBNAIL_MAX_SIZE
+    )
+    tissue_detection = detect_tissue(rgb)
+
+    tissue = tissue_service.generate_tissue_mask(
+        db, image_id, file_path, rgb=rgb, scale=scale, tissue=tissue_detection
+    )
     density = density_service.generate_density(
-        db, image_id, file_path, grid_size=grid_size, colormap=colormap
+        db, image_id, file_path, grid_size=grid_size, colormap=colormap,
+        rgb=rgb, scale=scale, tissue=tissue_detection,
     )
 
     summary = _build_summary(

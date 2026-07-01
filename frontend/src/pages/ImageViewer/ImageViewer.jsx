@@ -52,6 +52,8 @@ const ImageViewer = () => {
   const [editingAnnotation, setEditingAnnotation] = useState(null);
   const [showCocoImport, setShowCocoImport] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  // Id de la anotación cuyo dashboard se muestra (null = dashboard de imagen).
+  const [analyticsAnnotationId, setAnalyticsAnnotationId] = useState(null);
 
   // Referencias imperativas a los controles de overlay, para que la paleta de
   // comandos pueda mostrarlos/alternarlos directamente tras ejecutar un comando.
@@ -122,6 +124,18 @@ const ImageViewer = () => {
     setEditingAnnotation(ann);
   }, []);
 
+  // Abre el dashboard de análisis acotado a la región de una anotación.
+  const handleAnalyzeAnnotation = useCallback(ann => {
+    setSelectedId(ann.id);
+    setAnalyticsAnnotationId(ann.id);
+    setShowAnalytics(true);
+  }, []);
+
+  const handleCloseAnalytics = useCallback(() => {
+    setShowAnalytics(false);
+    setAnalyticsAnnotationId(null);
+  }, []);
+
   const handleSubmitEdit = async ({ label, color: shapeColor, class_id }) => {
     await updateAnnotation(editingAnnotation.id, {
       label,
@@ -181,6 +195,7 @@ const ImageViewer = () => {
           if (command.route) navigate(command.route);
           break;
         case 'open-analytics':
+          setAnalyticsAnnotationId(null);
           setShowAnalytics(true);
           break;
         case 'toggle-tissue-mask':
@@ -269,7 +284,10 @@ const ImageViewer = () => {
         </button>
         <button
           className="analytics-open-btn"
-          onClick={() => setShowAnalytics(true)}
+          onClick={() => {
+            setAnalyticsAnnotationId(null);
+            setShowAnalytics(true);
+          }}
         >
           <BarChart3 size={16} /> Dashboard
         </button>
@@ -325,6 +343,7 @@ const ImageViewer = () => {
             onSelect={setSelectedId}
             onCenter={handleCenter}
             onEdit={handleEdit}
+            onAnalyze={handleAnalyzeAnnotation}
             onDelete={handleDelete}
             onExportCoco={handleExportCoco}
             onImportCoco={() => setShowCocoImport(true)}
@@ -343,7 +362,8 @@ const ImageViewer = () => {
       {showAnalytics && (
         <AnalyticsDashboard
           imageId={numericId}
-          onClose={() => setShowAnalytics(false)}
+          annotationId={analyticsAnnotationId}
+          onClose={handleCloseAnalytics}
         />
       )}
 

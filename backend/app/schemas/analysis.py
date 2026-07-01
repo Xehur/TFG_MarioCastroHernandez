@@ -21,6 +21,7 @@ class AnalysisResultResponse(BaseModel):
     """Respuesta genérica de un resultado de análisis."""
     id: int
     image_id: int
+    annotation_id: Optional[int] = None
     analysis_type: str
     result_data: Dict[str, Any]
     created_at: datetime
@@ -34,6 +35,7 @@ class DensityMapResponse(BaseModel):
     """Respuesta de un mapa de densidades (matriz + metadatos)."""
     id: int
     image_id: int
+    annotation_id: Optional[int] = None
     grid_size: int
     density_data: Dict[str, Any]
     created_at: datetime
@@ -47,6 +49,7 @@ class FullAnalysisResponse(BaseModel):
     """Respuesta del análisis consolidado (tejido + densidad)."""
     id: int
     image_id: int
+    annotation_id: Optional[int] = None
     analysis_type: str
     result_data: Dict[str, Any]
     created_at: datetime
@@ -59,6 +62,7 @@ class FullAnalysisResponse(BaseModel):
 class AnalyticsResponse(BaseModel):
     """Conjunto de datos de analíticas listos para gráficas y tablas."""
     image_id: int
+    annotation_id: Optional[int] = None
     total_annotations: int
     by_type: list
     by_class: list

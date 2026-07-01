@@ -153,6 +153,77 @@ class OpenSlideService:
         scale = height / thumb_h if thumb_h else 1.0
         return arr, scale
 
+    def read_region_rgb(
+        self,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+        max_size: int = 2048,
+    ):
+        """
+        Lee una región arbitraria de la imagen como array numpy RGB (H, W, 3).
+
+        Selecciona automáticamente el nivel de la pirámide de forma que el lado
+        mayor de la región no supere ``max_size`` píxeles, manteniendo bajo el
+        uso de memoria. Se usa para analizar zonas concretas (anotaciones) a
+        baja resolución (detección de tejido, mapas de densidad).
+
+        Args:
+            x, y: esquina superior izquierda de la región en píxeles de la
+                imagen base (nivel 0).
+            width, height: tamaño de la región en píxeles de la imagen base.
+            max_size: lado máximo (px) de la región leída.
+
+        Returns:
+            (array numpy uint8 RGB, escala, bbox_usado) donde escala =
+            tamaño_base / tamaño_leído y bbox_usado = (x, y, width, height) tras
+            recortar a los límites de la imagen.
+        """
+        import numpy as np
+
+        base_w, base_h = self.slide.dimensions
+
+        # Normaliza anchos/altos negativos (formas dibujadas "hacia atrás").
+        x = int(round(x))
+        y = int(round(y))
+        width = int(round(width))
+        height = int(round(height))
+        if width < 0:
+            x += width
+            width = -width
+        if height < 0:
+            y += height
+            height = -height
+
+        # Recorta a los límites de la imagen.
+        x = max(0, min(x, base_w - 1))
+        y = max(0, min(y, base_h - 1))
+        width = max(1, min(width, base_w - x))
+        height = max(1, min(height, base_h - y))
+
+        # Elige el nivel cuyo downsample sea el mayor que aún deje la región
+        # por encima de ``max_size`` (es decir, el más ligero suficiente).
+        target_ds = max(1.0, max(width, height) / float(max_size))
+        level = 0
+        for i, ds in enumerate(self.slide.level_downsamples):
+            if ds <= target_ds:
+                level = i
+            else:
+                break
+        ds = self.slide.level_downsamples[level]
+
+        out_w = max(1, int(round(width / ds)))
+        out_h = max(1, int(round(height / ds)))
+
+        region = self.slide.read_region((x, y), level, (out_w, out_h))
+        if region.mode != "RGB":
+            region = region.convert("RGB")
+        arr = np.asarray(region, dtype=np.uint8)
+
+        scale = height / arr.shape[0] if arr.shape[0] else 1.0
+        return arr, scale, (x, y, width, height)
+
     def close(self) -> None:
         """Cierra la imagen."""
         if self.slide:

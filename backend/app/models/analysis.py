@@ -26,6 +26,14 @@ class AnalysisResult(Base):
     image_id = Column(
         Integer, ForeignKey("images.id"), index=True, nullable=False
     )
+    # Si el análisis es sobre una anotación (zona marcada) en vez de sobre la
+    # imagen completa, apunta a dicha anotación. NULL = análisis de imagen.
+    annotation_id = Column(
+        Integer,
+        ForeignKey("annotations.id", ondelete="CASCADE"),
+        index=True,
+        nullable=True,
+    )
     # p.ej. "tissue_mask", "density_map", "full_analysis"
     analysis_type = Column(String, nullable=False, index=True)
     # Métricas y metadatos del análisis (estructura según analysis_type)
@@ -49,6 +57,14 @@ class DensityMap(Base):
     id = Column(Integer, primary_key=True, index=True)
     image_id = Column(
         Integer, ForeignKey("images.id"), index=True, nullable=False
+    )
+    # Si el mapa es sobre una anotación (zona marcada) en vez de sobre la
+    # imagen completa, apunta a dicha anotación. NULL = mapa de imagen.
+    annotation_id = Column(
+        Integer,
+        ForeignKey("annotations.id", ondelete="CASCADE"),
+        index=True,
+        nullable=True,
     )
     # Tamaño de celda del grid en píxeles de la imagen base
     grid_size = Column(Integer, nullable=False)

@@ -51,18 +51,26 @@ def generate_density(
     grid_size: int = DEFAULT_GRID_SIZE,
     colormap: str = DEFAULT_COLORMAP,
     max_size: int = _THUMBNAIL_MAX_SIZE,
+    *,
+    rgb=None,
+    scale: Optional[float] = None,
+    tissue=None,
 ) -> DensityMap:
     """
     Ejecuta la generación del mapa de densidades, guarda el PNG del heatmap y
     persiste (o actualiza) el registro DensityMap con la matriz y metadatos.
-    """
-    slide = OpenSlideService(file_path)
-    try:
-        rgb, scale = slide.get_thumbnail_rgb(max_size=max_size)
-    finally:
-        slide.close()
 
-    tissue = detect_tissue(rgb)
+    ``rgb``/``scale``/``tissue`` opcionales permiten reutilizar una miniatura y
+    una detección ya calculadas (p.ej. en el análisis consolidado).
+    """
+    if rgb is None or scale is None:
+        slide = OpenSlideService(file_path)
+        try:
+            rgb, scale = slide.get_thumbnail_rgb(max_size=max_size)
+        finally:
+            slide.close()
+
+    tissue = tissue if tissue is not None else detect_tissue(rgb)
     base_width = int(round(tissue.width * scale))
     base_height = int(round(tissue.height * scale))
 
@@ -116,6 +124,7 @@ def _exact_cached(
         db.query(DensityMap)
         .filter(
             DensityMap.image_id == image_id,
+            DensityMap.annotation_id.is_(None),
             DensityMap.grid_size == grid_size,
         )
         .order_by(DensityMap.created_at.desc())

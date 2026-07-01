@@ -22,3 +22,14 @@ class Image(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    analysis_results = relationship(
+        "AnalysisResult",
+        back_populates="image",
+        cascade="all, delete-orphan",
+    )
+    density_maps = relationship(
+        "DensityMap",
+        back_populates="image",
+        cascade="all, delete-orphan",
+    )

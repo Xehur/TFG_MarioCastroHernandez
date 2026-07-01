@@ -1,0 +1,170 @@
+"""
+Tests del algoritmo de detección de tejido y de los endpoints de análisis.
+"""
+import os
+import numpy as np
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from app.config import settings
+from app.models.image import Image
+from app.services.analysis import tissue_detection, tissue_service
+
+
+# --- Utilidades --------------------------------------------------------------
+
+def _synthetic_slide_rgb(size=120, block=40):
+    """Fondo blanco con un bloque central coloreado (tejido simulado)."""
+    img = np.full((size, size, 3), 240, dtype=np.uint8)
+    start = (size - block) // 2
+    img[start:start + block, start:start + block] = [150, 40, 80]
+    return img
+
+
+class _FakeSlide:
+    """Sustituto de OpenSlideService que devuelve una miniatura sintética."""
+
+    def __init__(self, file_path):
+        self.file_path = file_path
+
+    def get_thumbnail_rgb(self, max_size=2048):
+        return _synthetic_slide_rgb(), 1.0
+
+    def close(self):
+        pass
+
+
+def _make_image_with_file(filename="tissue_test.svs", user_id=1):
+    """Crea un registro Image y un archivo dummy en disco."""
+    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+    file_path = os.path.join(settings.UPLOAD_DIR, filename)
+    with open(file_path, "wb") as fh:
+        fh.write(b"dummy")
+
+    engine = create_engine(
+        "sqlite:///./test.db", connect_args={"check_same_thread": False}
+    )
+    SessionLocal = sessionmaker(bind=engine)
+    db = SessionLocal()
+    try:
+        image = Image(
+            filename=filename,
+            file_path=file_path,
+            user_id=user_id,
+            width=120,
+            height=120,
+            level_count=1,
+        )
+        db.add(image)
+        db.commit()
+        db.refresh(image)
+        return image.id, file_path
+    finally:
+        db.close()
+
+
+@pytest.fixture(autouse=True)
+def _patch_slide(monkeypatch):
+    """Evita depender de un archivo WSI real en los tests de endpoint."""
+    monkeypatch.setattr(tissue_service, "OpenSlideService", _FakeSlide)
+    yield
+
+
+# --- Tests del algoritmo -----------------------------------------------------
+
+def test_detect_tissue_basic():
+    result = tissue_detection.detect_tissue(_synthetic_slide_rgb())
+    assert result.width == 120 and result.height == 120
+    assert 5 < result.tissue_percent < 30
+    assert result.mask.dtype == bool
+    assert result.mask.sum() > 0
+
+
+def test_detect_tissue_all_background():
+    """Imagen blanca uniforme: no debería detectar tejido."""
+    white = np.full((80, 80, 3), 255, dtype=np.uint8)
+    result = tissue_detection.detect_tissue(white)
+    assert result.tissue_percent == 0.0
+    assert result.mask.sum() == 0
+
+
+def test_detect_tissue_handles_grayscale_input():
+    gray = np.full((60, 60), 200, dtype=np.uint8)
+    gray[20:40, 20:40] = 30
+    result = tissue_detection.detect_tissue(gray)
+    assert result.mask.sum() > 0
+
+
+def test_detect_tissue_handles_rgba_input():
+    rgba = np.full((60, 60, 4), 240, dtype=np.uint8)
+    rgba[..., 3] = 255
+    rgba[20:40, 20:40, :3] = [140, 30, 70]
+    result = tissue_detection.detect_tissue(rgba)
+    assert result.mask.shape == (60, 60)
+    assert result.mask.sum() > 0
+
+
+def test_stats_serializable():
+    result = tissue_detection.detect_tissue(_synthetic_slide_rgb())
+    stats = result.stats()
+    assert "tissue_percent" in stats
+    assert stats["width"] == 120
+    assert stats["method"] == "otsu_saturation_intensity"
+
+
+def test_mask_to_rgba_overlay():
+    mask = np.zeros((10, 10), dtype=bool)
+    mask[2:5, 2:5] = True
+    overlay = tissue_detection.mask_to_rgba_overlay(mask, color=(1, 2, 3), alpha=200)
+    assert overlay.shape == (10, 10, 4)
+    assert list(overlay[3, 3]) == [1, 2, 3, 200]
+    assert list(overlay[0, 0]) == [0, 0, 0, 0]
+
+
+# --- Tests de endpoints ------------------------------------------------------
+
+def test_get_tissue_mask_returns_png(client):
+    image_id, _ = _make_image_with_file()
+    resp = client.get(f"/images/{image_id}/tissue-mask")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "image/png"
+    assert resp.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_get_tissue_mask_stats(client):
+    image_id, _ = _make_image_with_file(filename="tissue_test2.svs")
+    resp = client.get(f"/images/{image_id}/tissue-mask/stats")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["analysis_type"] == "tissue_mask"
+    assert "tissue_percent" in data["result_data"]
+    assert data["image_id"] == image_id
+
+
+def test_tissue_mask_is_cached(client):
+    image_id, _ = _make_image_with_file(filename="tissue_test3.svs")
+    first = client.get(f"/images/{image_id}/tissue-mask/stats").json()
+    second = client.get(f"/images/{image_id}/tissue-mask/stats").json()
+    # Mismo registro (no se crea uno nuevo)
+    assert first["id"] == second["id"]
+
+
+def test_analyze_tissue_forces_regeneration(client):
+    image_id, _ = _make_image_with_file(filename="tissue_test4.svs")
+    first = client.get(f"/images/{image_id}/tissue-mask/stats").json()
+    resp = client.post(f"/images/{image_id}/analyze/tissue")
+    assert resp.status_code == 201
+    # El id del registro se mantiene (se actualiza in-place)
+    assert resp.json()["id"] == first["id"]
+
+
+def test_tissue_mask_image_not_found(client):
+    resp = client.get("/images/99999/tissue-mask")
+    assert resp.status_code == 404
+
+
+def test_tissue_mask_requires_auth(anon_client):
+    image_id, _ = _make_image_with_file(filename="tissue_test5.svs")
+    resp = anon_client.get(f"/images/{image_id}/tissue-mask")
+    assert resp.status_code in (401, 403)

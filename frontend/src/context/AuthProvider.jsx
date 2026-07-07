@@ -54,6 +54,11 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   }, []);
 
+  const updateUser = useCallback(nextUser => {
+    setUser(nextUser);
+    authService.setStoredUser(nextUser);
+  }, []);
+
   const value = {
     user,
     isAuthenticated: Boolean(user),
@@ -61,6 +66,7 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
+    updateUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

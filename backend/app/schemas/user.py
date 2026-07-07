@@ -24,6 +24,20 @@ class UserLogin(BaseModel):
     password: str
 
 
+class UserUpdate(BaseModel):
+    """
+    Datos para actualizar el perfil del usuario autenticado.
+
+    Todos los campos son opcionales; solo se aplican los presentes. Para
+    cambiar la contraseña hay que enviar ``current_password`` (verificación)
+    junto con ``new_password``.
+    """
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    current_password: Optional[str] = None
+    new_password: Optional[str] = Field(default=None, min_length=6, max_length=128)
+
+
 class UserResponse(BaseModel):
     id: int
     email: str

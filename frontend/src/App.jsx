@@ -4,6 +4,7 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import { ImageViewer } from './pages/ImageViewer';
 import ImageList from './pages/ImageList';
 import Upload from './pages/Upload';
+import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import './App.css';
@@ -28,6 +29,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Upload />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Settings />
               </ProtectedRoute>
             }
           />

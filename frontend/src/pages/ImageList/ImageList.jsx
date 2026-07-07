@@ -10,6 +10,7 @@ import {
   HardDrive,
   Calendar,
   Eye,
+  Trash2,
 } from 'lucide-react';
 import { imageService } from '../../services/imageService';
 import { formatFileSize, formatDate } from '../../utils/helpers';
@@ -24,6 +25,8 @@ const ImageList = () => {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     const loadImages = async () => {
@@ -63,6 +66,31 @@ const ImageList = () => {
 
   const handleUploadNew = () => {
     navigate('/upload');
+  };
+
+  const handleAskDelete = (e, imageId) => {
+    e.stopPropagation();
+    setConfirmDeleteId(imageId);
+  };
+
+  const handleCancelDelete = e => {
+    e.stopPropagation();
+    setConfirmDeleteId(null);
+  };
+
+  const handleConfirmDelete = async (e, imageId) => {
+    e.stopPropagation();
+    try {
+      setDeletingId(imageId);
+      await imageService.deleteImage(imageId);
+      setImages(prev => prev.filter(img => img.id !== imageId));
+      setConfirmDeleteId(null);
+    } catch (err) {
+      const detail = err.response?.data?.detail || err.message;
+      setError(typeof detail === 'string' ? detail : 'No se pudo eliminar la imagen');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   if (loading) {
@@ -156,9 +184,41 @@ const ImageList = () => {
               </div>
 
               <div className="image-card-footer">
-                <button className="view-btn">
-                  <Eye size={16} /> Ver imagen
-                </button>
+                {confirmDeleteId === image.id ? (
+                  <div className="delete-confirm" onClick={e => e.stopPropagation()}>
+                    <span className="delete-confirm-text">¿Eliminar imagen?</span>
+                    <div className="delete-confirm-actions">
+                      <button
+                        className="delete-cancel-btn"
+                        onClick={handleCancelDelete}
+                        disabled={deletingId === image.id}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        className="delete-confirm-btn"
+                        onClick={e => handleConfirmDelete(e, image.id)}
+                        disabled={deletingId === image.id}
+                      >
+                        {deletingId === image.id ? 'Eliminando…' : 'Eliminar'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="card-actions">
+                    <button className="view-btn">
+                      <Eye size={16} /> Ver imagen
+                    </button>
+                    <button
+                      className="delete-btn"
+                      onClick={e => handleAskDelete(e, image.id)}
+                      title="Eliminar imagen"
+                      aria-label="Eliminar imagen"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}

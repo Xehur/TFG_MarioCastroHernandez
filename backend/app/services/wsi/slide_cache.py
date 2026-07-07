@@ -107,6 +107,22 @@ class SlideCache:
         cache_key = (file_path, level, col, row)
         self._tiles.set(cache_key, data)
 
+    def evict(self, file_path: str):
+        """
+        Cierra y descarta el slide indicado y sus tiles cacheados.
+
+        Necesario antes de borrar el archivo WSI del disco: en Windows no se
+        puede eliminar un archivo mientras OpenSlide lo mantiene abierto.
+        """
+        with self._slides._lock:
+            entry = self._slides._data.pop(file_path, None)
+        if entry is not None:
+            self._close_slide(entry)
+        with self._tiles._lock:
+            keys = [k for k in self._tiles._data if k[0] == file_path]
+            for k in keys:
+                self._tiles._data.pop(k, None)
+
     def clear(self):
         self._slides.clear(on_evict=self._close_slide)
         self._tiles.clear()

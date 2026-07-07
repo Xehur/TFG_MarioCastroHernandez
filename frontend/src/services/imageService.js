@@ -24,6 +24,14 @@ export const imageService = {
   },
 
   /**
+   * Eliminar una imagen por ID.
+   */
+  deleteImage: async imageId => {
+    const response = await apiClient.delete(`/images/${imageId}`);
+    return response.data;
+  },
+
+  /**
    * Construye la URL del descriptor DZI (metadatos de la pirámide de tiles).
    * La usa OpenSeadragon como tileSource.
    */

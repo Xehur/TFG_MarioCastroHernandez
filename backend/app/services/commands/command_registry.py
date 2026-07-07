@@ -80,6 +80,20 @@ COMMANDS: List[Dict[str, Any]] = [
         "params": [_IMAGE_ID_PARAM],
         "keywords": ["densidad", "heatmap", "mapa", "zonas"],
     },
+    {
+        "id": "classify-tissue-ai",
+        "name": "Clasificar tejido (IA)",
+        "description": "Clasifica el tejido en categorías histológicas (tumoral, estroma, necrosis...) con un modelo de IA.",
+        "category": CATEGORY_ANALYSIS,
+        "icon": "Brain",
+        "target": TARGET_BACKEND,
+        "method": "POST",
+        "endpoint": "/images/{image_id}/analyze/ai",
+        "action": None,
+        "route": None,
+        "params": [_IMAGE_ID_PARAM],
+        "keywords": ["ia", "ai", "clasificacion", "tumor", "estroma", "necrosis", "deep learning"],
+    },
     # --- Visualización (las gestiona la UI) --------------------------------
     {
         "id": "open-analytics-dashboard",

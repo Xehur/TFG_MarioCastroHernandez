@@ -38,7 +38,7 @@ describe('tissueService', () => {
     apiClient.get.mockResolvedValue({ data: blob });
     const url = await tissueService.getMaskObjectUrl(7);
     expect(apiClient.get).toHaveBeenCalledWith('/images/7/tissue-mask', {
-      params: { force: false },
+      params: { force: false, _ts: expect.any(Number) },
       responseType: 'blob',
     });
     expect(url).toBe('blob:mock-url');

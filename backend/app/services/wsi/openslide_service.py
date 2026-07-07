@@ -1,6 +1,7 @@
 import os
 from openslide import OpenSlide, OpenSlideError
 from openslide.deepzoom import DeepZoomGenerator
+from PIL import Image as PILImage
 from typing import Tuple, List, Optional
 
 
@@ -223,6 +224,66 @@ class OpenSlideService:
 
         scale = height / arr.shape[0] if arr.shape[0] else 1.0
         return arr, scale, (x, y, width, height)
+
+    def get_mpp_x(self) -> Optional[float]:
+        """Micras por píxel en X (magnificación física), o None si no consta."""
+        try:
+            value = float(self.slide.properties.get("openslide.mpp-x"))
+        except (TypeError, ValueError):
+            return None
+        return value if value and value > 0 else None
+
+    def read_patch_rgb(
+        self,
+        center_x: float,
+        center_y: float,
+        size_level0: int,
+        out_size: int = 224,
+    ):
+        """
+        Lee un parche cuadrado centrado en (center_x, center_y) para clasificación.
+
+        El parche cubre ``size_level0`` px en coordenadas de nivel 0 y se
+        devuelve como array RGB (out_size, out_size, 3). Se escoge el nivel de la
+        pirámide más detallado cuyo downsample no supere el necesario para
+        obtener ``out_size`` px, evitando leer (y descartar) resolución de más y
+        preservando así la magnificación efectiva del parche.
+
+        Args:
+            center_x, center_y: centro del parche en píxeles de nivel 0.
+            size_level0: lado del parche en píxeles de nivel 0.
+            out_size: lado del parche devuelto (entrada del modelo).
+
+        Returns:
+            array numpy uint8 RGB (out_size, out_size, 3).
+        """
+        import numpy as np
+
+        base_w, base_h = self.slide.dimensions
+        size_level0 = max(1, int(round(size_level0)))
+
+        x = int(round(center_x - size_level0 / 2.0))
+        y = int(round(center_y - size_level0 / 2.0))
+        x = max(0, min(x, max(0, base_w - size_level0)))
+        y = max(0, min(y, max(0, base_h - size_level0)))
+
+        # Nivel más detallado cuyo downsample siga sin sobre-reducir el parche.
+        target_ds = max(1.0, size_level0 / float(out_size))
+        level = 0
+        for i, ds in enumerate(self.slide.level_downsamples):
+            if ds <= target_ds + 1e-6:
+                level = i
+            else:
+                break
+        ds = self.slide.level_downsamples[level]
+        read_size = max(1, int(round(size_level0 / ds)))
+
+        region = self.slide.read_region((x, y), level, (read_size, read_size))
+        if region.mode != "RGB":
+            region = region.convert("RGB")
+        if read_size != out_size:
+            region = region.resize((out_size, out_size), PILImage.BICUBIC)
+        return np.asarray(region, dtype=np.uint8)
 
     def close(self) -> None:
         """Cierra la imagen."""

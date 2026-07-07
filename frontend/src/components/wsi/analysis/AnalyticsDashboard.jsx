@@ -5,6 +5,7 @@ import {
   Grid3x3,
   Activity,
   Layers,
+  Brain,
   AlertCircle,
   Loader2,
   RefreshCw,
@@ -28,6 +29,7 @@ import {
 } from 'recharts';
 import { analyticsService } from '../../../services/analyticsService';
 import { annotationAnalysisService } from '../../../services/annotationAnalysisService';
+import { aiClassificationService } from '../../../services/aiClassificationService';
 import './AnalyticsDashboard.css';
 
 const CHART_COLORS = [
@@ -181,12 +183,42 @@ const AnalyticsDashboard = ({ imageId, annotationId, onClose }) => {
   const [error, setError] = useState(null);
   const [spatialBins, setSpatialBins] = useState(10);
 
+  const [aiData, setAiData] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(null);
+
   const isAnnotation = annotationId != null;
 
   const typeRef = useRef(null);
   const classRef = useRef(null);
   const densityLineRef = useRef(null);
   const histRef = useRef(null);
+  const aiRef = useRef(null);
+
+  // Reinicia la clasificación IA al cambiar de ámbito (imagen o anotación).
+  useEffect(() => {
+    setAiData(null);
+    setAiError(null);
+  }, [imageId, annotationId]);
+
+  const runAiClassification = useCallback(async () => {
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const res = isAnnotation
+        ? await aiClassificationService.analyzeAnnotation(annotationId)
+        : await aiClassificationService.analyze(imageId);
+      setAiData(res.result_data || null);
+    } catch (err) {
+      setAiError(
+        err.response?.data?.detail ||
+          err.message ||
+          'Error en la clasificación IA'
+      );
+    } finally {
+      setAiLoading(false);
+    }
+  }, [isAnnotation, annotationId, imageId]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -242,6 +274,17 @@ const AnalyticsDashboard = ({ imageId, annotationId, onClose }) => {
         count,
       }))
     : [];
+
+  const aiGroupData = (aiData?.groups || [])
+    .filter(g => g.percent > 0)
+    .map(g => ({
+      group: g.group,
+      percent: g.percent,
+      fill: `rgb(${g.color.join(',')})`,
+    }));
+  const aiDominant = aiData?.classes?.find(
+    c => c.code === aiData.dominant_class
+  );
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -335,6 +378,88 @@ const AnalyticsDashboard = ({ imageId, annotationId, onClose }) => {
             </div>
 
             <div className="analytics-grid">
+              <ChartCard
+                icon={Brain}
+                title="Clasificación de tejido (IA)"
+                exportName="clasificacion-ia"
+                chartRef={aiRef}
+              >
+                {aiData ? (
+                  <>
+                    <p className="analytics-caption">
+                      Modelo {aiData.model?.dataset || 'IA'}. Clase predominante:{' '}
+                      <strong>{aiDominant ? aiDominant.name : '—'}</strong>
+                      {aiData.dominant_group
+                        ? ` (${aiData.dominant_group})`
+                        : ''}
+                      .
+                    </p>
+                    {aiGroupData.length ? (
+                      <ResponsiveContainer width="100%" height={220}>
+                        <BarChart data={aiGroupData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                          <XAxis dataKey="group" fontSize={12} />
+                          <YAxis
+                            fontSize={12}
+                            unit="%"
+                            domain={[0, 100]}
+                          />
+                          <Tooltip
+                            formatter={v => [`${v.toFixed(1)}%`, 'Proporción']}
+                          />
+                          <Bar dataKey="percent" radius={[6, 6, 0, 0]}>
+                            {aiGroupData.map((entry, i) => (
+                              <Cell key={i} fill={entry.fill} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <p className="analytics-empty">
+                        El modelo no detectó tejido clasificable en la región.
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      className="analytics-ai-run"
+                      onClick={runAiClassification}
+                      disabled={aiLoading}
+                    >
+                      {aiLoading ? (
+                        <Loader2 size={14} className="analytics-spin" />
+                      ) : (
+                        <RefreshCw size={14} />
+                      )}
+                      Re-clasificar
+                    </button>
+                  </>
+                ) : aiLoading ? (
+                  <p className="analytics-loading">
+                    <Loader2 size={18} className="analytics-spin" /> Clasificando
+                    con IA…
+                  </p>
+                ) : (
+                  <div className="analytics-ai-cta">
+                    <p className="analytics-empty">
+                      Clasifica el tejido en categorías histológicas (tumoral,
+                      estroma, no tumoral, necrosis) con un modelo de IA.
+                    </p>
+                    <button
+                      type="button"
+                      className="analytics-ai-run"
+                      onClick={runAiClassification}
+                    >
+                      <Brain size={15} /> Ejecutar clasificación IA
+                    </button>
+                    {aiError && (
+                      <p className="analytics-error">
+                        <AlertCircle size={14} /> {aiError}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </ChartCard>
+
               {!isAnnotation && (
                 <ChartCard
                   icon={BarChart3}

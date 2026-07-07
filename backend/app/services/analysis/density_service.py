@@ -18,7 +18,9 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.analysis import DensityMap
 from app.services.wsi.openslide_service import OpenSlideService
-from app.services.analysis.tissue_detection import detect_tissue
+from app.services.analysis.tissue_detection import (
+    detect_tissue,
+)
 from app.services.analysis.density_generation import (
     generate_density_map,
     density_to_heatmap_rgba,
@@ -95,6 +97,7 @@ def generate_density(
     data["map_path"] = png_path
     data["thumbnail_max_size"] = max_size
     data["tissue_percent"] = round(tissue.tissue_percent, 4)
+    data["detector_mode"] = "classical"
     # Paradas de color (RGB 0-255) para dibujar el colorbar en el frontend.
     data["colorbar"] = _colormap_lut(colormap, samples=16)
 
@@ -151,8 +154,11 @@ def get_or_create_density(
     if not force:
         cached = _exact_cached(db, image_id, grid_size, colormap)
         if cached is not None:
-            map_path = (cached.density_data or {}).get("map_path")
-            if map_path and os.path.exists(map_path):
+            data = cached.density_data or {}
+            map_path = data.get("map_path")
+            # Regenera mapas derivados del antiguo detector de IA para curarlos.
+            mode_ok = data.get("detector_mode") == "classical"
+            if map_path and os.path.exists(map_path) and mode_ok:
                 return cached
     return generate_density(db, image_id, file_path, grid_size, colormap)
 

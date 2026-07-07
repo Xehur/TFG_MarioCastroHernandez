@@ -16,6 +16,7 @@ from app.services.analysis import (
     analysis_service,
     tissue_service,
     density_service,
+    ai_classification_service,
 )
 from app.services.commands import command_registry
 
@@ -71,10 +72,25 @@ def _generate_density_map(db: Session, params: Dict[str, Any]) -> Dict[str, Any]
     }
 
 
+def _classify_tissue_ai(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
+    image = _require_image(db, params)
+    result = ai_classification_service.generate_image_classification(
+        db, image.id, image.file_path
+    )
+    data = result.result_data or {}
+    return {
+        "analysis_id": result.id,
+        "dominant_class": data.get("dominant_class"),
+        "dominant_group": data.get("dominant_group"),
+        "summary": data,
+    }
+
+
 _HANDLERS = {
     "run-full-analysis": _run_full_analysis,
     "detect-tissue": _detect_tissue,
     "generate-density-map": _generate_density_map,
+    "classify-tissue-ai": _classify_tissue_ai,
 }
 
 

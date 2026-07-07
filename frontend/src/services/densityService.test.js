@@ -38,7 +38,7 @@ describe('densityService', () => {
     apiClient.get.mockResolvedValue({ data: blob });
     const url = await densityService.getMapObjectUrl(7, { gridSize: 512 });
     expect(apiClient.get).toHaveBeenCalledWith('/images/7/density-map', {
-      params: { grid_size: 512, colormap: 'viridis', force: false },
+      params: { grid_size: 512, colormap: 'viridis', force: false, _ts: expect.any(Number) },
       responseType: 'blob',
     });
     expect(url).toBe('blob:mock-url');

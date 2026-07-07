@@ -96,6 +96,7 @@ def generate_tissue_mask(
     stats["scale"] = scale
     stats["mask_path"] = png_path
     stats["thumbnail_max_size"] = max_size
+    stats["detector_mode"] = "classical"
 
     existing = get_cached_result(db, image_id)
     if existing is not None:
@@ -128,8 +129,12 @@ def get_or_create_tissue_mask(
     if not force:
         cached = get_cached_result(db, image_id)
         if cached is not None:
-            mask_path = (cached.result_data or {}).get("mask_path")
-            if mask_path and os.path.exists(mask_path):
+            data = cached.result_data or {}
+            mask_path = data.get("mask_path")
+            # Regenera máscaras generadas por el antiguo detector de IA
+            # (detector_mode != "classical" o ausente) para auto-curarlas.
+            mode_ok = data.get("detector_mode") == "classical"
+            if mask_path and os.path.exists(mask_path) and mode_ok:
                 return cached
     return generate_tissue_mask(db, image_id, file_path)
 

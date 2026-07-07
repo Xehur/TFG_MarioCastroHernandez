@@ -22,6 +22,7 @@ import {
 import {
   TissueMaskControl,
   DensityMapViewer,
+  AIClassificationControl,
   AnalysisResultsPanel,
   AnalyticsDashboard,
   CommandPalette,
@@ -59,6 +60,7 @@ const ImageViewer = () => {
   // comandos pueda mostrarlos/alternarlos directamente tras ejecutar un comando.
   const tissueControlRef = useRef(null);
   const densityControlRef = useRef(null);
+  const aiControlRef = useRef(null);
 
   const {
     annotations,
@@ -182,6 +184,9 @@ const ImageViewer = () => {
           return;
         case 'generate-density-map':
           densityControlRef.current?.show();
+          return;
+        case 'classify-tissue-ai':
+          aiControlRef.current?.show();
           return;
         case 'run-full-analysis':
           tissueControlRef.current?.show();
@@ -333,6 +338,11 @@ const ImageViewer = () => {
           />
           <DensityMapViewer
             ref={densityControlRef}
+            viewer={viewer}
+            imageId={numericId}
+          />
+          <AIClassificationControl
+            ref={aiControlRef}
             viewer={viewer}
             imageId={numericId}
           />

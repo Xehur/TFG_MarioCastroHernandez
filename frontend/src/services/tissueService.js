@@ -18,7 +18,7 @@ export const tissueService = {
    */
   getMaskObjectUrl: async (imageId, { force = false } = {}) => {
     const response = await apiClient.get(`/images/${imageId}/tissue-mask`, {
-      params: { force },
+      params: { force, _ts: Date.now() },
       responseType: 'blob',
     });
     return URL.createObjectURL(response.data);

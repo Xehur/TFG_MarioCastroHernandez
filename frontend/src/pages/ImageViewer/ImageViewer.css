@@ -139,14 +139,21 @@
   background: rgba(28, 19, 48, 0.92);
   backdrop-filter: blur(8px);
   border-left: 1px solid rgba(178, 69, 146, 0.2);
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Los paneles apilados mantienen su altura natural; el propio panel lateral
+   se desplaza para que ninguno (p. ej. la lista de anotaciones) quede oculto
+   cuando otro se expande (p. ej. los resultados de clasificación IA). */
+.viewer-side-panel > * {
+  flex-shrink: 0;
 }
 
 .viewer-side-panel .annotation-panel {
   width: 100%;
   border-left: none;
-  flex: 1;
-  min-height: 0;
+  flex: 0 0 auto;
 }
 
 .image-viewer-page.loading,

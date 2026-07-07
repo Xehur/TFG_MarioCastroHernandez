@@ -34,6 +34,7 @@ from app.services.analysis import (
     analysis_service,
     analytics_service,
     annotation_analysis_service,
+    ai_classification_service,
 )
 from app.services.analysis.density_generation import (
     SUPPORTED_COLORMAPS,
@@ -102,7 +103,7 @@ def get_tissue_mask(
     return Response(
         content=png_bytes,
         media_type="image/png",
-        headers={"Cache-Control": "public, max-age=3600"},
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
     )
 
 
@@ -215,7 +216,7 @@ def get_density_map(
     return Response(
         content=png_bytes,
         media_type="image/png",
-        headers={"Cache-Control": "public, max-age=3600"},
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
     )
 
 
@@ -390,7 +391,7 @@ def get_annotation_tissue_mask(
     return Response(
         content=png_bytes,
         media_type="image/png",
-        headers={"Cache-Control": "public, max-age=3600"},
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
     )
 
 
@@ -475,7 +476,7 @@ def get_annotation_density_map(
     return Response(
         content=png_bytes,
         media_type="image/png",
-        headers={"Cache-Control": "public, max-age=3600"},
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
     )
 
 
@@ -608,4 +609,164 @@ def get_annotation_analytics(
         logger.error(f"Error generando analíticas de anotación: {exc}")
         raise HTTPException(
             status_code=500, detail=f"Error generando analíticas: {exc}"
+        )
+
+
+# --- Clasificación de tejido por IA (Sprint 7) ------------------------------
+
+
+@router.get("/images/{image_id}/ai-classification")
+def get_image_ai_classification(
+    image_id: int,
+    force: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """PNG (RGBA) del mapa de clases IA de la imagen. Lo genera si no existe."""
+    image = _get_image_or_404(db, image_id)
+    _ensure_file_exists(image)
+    try:
+        analysis = ai_classification_service.get_or_create_image_classification(
+            db, image_id, image.file_path, force=force
+        )
+        png_bytes = ai_classification_service.load_map_png_bytes(analysis)
+    except FileNotFoundError:
+        analysis = ai_classification_service.generate_image_classification(
+            db, image_id, image.file_path
+        )
+        png_bytes = ai_classification_service.load_map_png_bytes(analysis)
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"Error en clasificación IA de imagen: {exc}")
+        raise HTTPException(
+            status_code=500, detail=f"Error en clasificación IA: {exc}"
+        )
+    return Response(
+        content=png_bytes,
+        media_type="image/png",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+    )
+
+
+@router.get(
+    "/images/{image_id}/ai-classification/stats",
+    response_model=AnalysisResultResponse,
+)
+def get_image_ai_classification_stats(
+    image_id: int,
+    force: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Estadísticas de la clasificación IA de la imagen (JSON)."""
+    image = _get_image_or_404(db, image_id)
+    _ensure_file_exists(image)
+    try:
+        return ai_classification_service.get_or_create_image_classification(
+            db, image_id, image.file_path, force=force
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"Error en clasificación IA de imagen: {exc}")
+        raise HTTPException(
+            status_code=500, detail=f"Error en clasificación IA: {exc}"
+        )
+
+
+@router.post(
+    "/images/{image_id}/analyze/ai",
+    response_model=AnalysisResultResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def analyze_image_ai(
+    image_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Fuerza la (re)ejecución de la clasificación IA de la imagen."""
+    image = _get_image_or_404(db, image_id)
+    _ensure_file_exists(image)
+    try:
+        return ai_classification_service.generate_image_classification(
+            db, image_id, image.file_path
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"Error en clasificación IA de imagen: {exc}")
+        raise HTTPException(
+            status_code=500, detail=f"Error en clasificación IA: {exc}"
+        )
+
+
+@router.get("/annotations/{annotation_id}/ai-classification")
+def get_annotation_ai_classification(
+    annotation_id: int,
+    force: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """PNG (RGBA) del mapa de clases IA de la región anotada."""
+    annotation, image = _get_annotation_ctx(db, annotation_id)
+    try:
+        analysis = ai_classification_service.get_or_create_annotation_classification(
+            db, annotation, image.file_path, force=force
+        )
+        png_bytes = ai_classification_service.load_map_png_bytes(analysis)
+    except FileNotFoundError:
+        analysis = ai_classification_service.generate_annotation_classification(
+            db, annotation, image.file_path
+        )
+        png_bytes = ai_classification_service.load_map_png_bytes(analysis)
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"Error en clasificación IA de anotación: {exc}")
+        raise HTTPException(
+            status_code=500, detail=f"Error en clasificación IA: {exc}"
+        )
+    return Response(
+        content=png_bytes,
+        media_type="image/png",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+    )
+
+
+@router.get(
+    "/annotations/{annotation_id}/ai-classification/stats",
+    response_model=AnalysisResultResponse,
+)
+def get_annotation_ai_classification_stats(
+    annotation_id: int,
+    force: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Estadísticas de la clasificación IA de la anotación (JSON)."""
+    annotation, image = _get_annotation_ctx(db, annotation_id)
+    try:
+        return ai_classification_service.get_or_create_annotation_classification(
+            db, annotation, image.file_path, force=force
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"Error en clasificación IA de anotación: {exc}")
+        raise HTTPException(
+            status_code=500, detail=f"Error en clasificación IA: {exc}"
+        )
+
+
+@router.post(
+    "/annotations/{annotation_id}/analyze/ai",
+    response_model=AnalysisResultResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def analyze_annotation_ai(
+    annotation_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Fuerza la (re)ejecución de la clasificación IA de la región anotada."""
+    annotation, image = _get_annotation_ctx(db, annotation_id)
+    try:
+        return ai_classification_service.generate_annotation_classification(
+            db, annotation, image.file_path
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"Error en clasificación IA de anotación: {exc}")
+        raise HTTPException(
+            status_code=500, detail=f"Error en clasificación IA: {exc}"
         )

@@ -18,6 +18,7 @@ import {
   Pentagon,
   Images,
   UploadCloud,
+  Brain,
 } from 'lucide-react';
 import { commandService } from '../../../services/commandService';
 import './CommandPalette.css';
@@ -35,6 +36,7 @@ const ICONS = {
   Pentagon,
   Images,
   UploadCloud,
+  Brain,
 };
 
 const CommandIcon = ({ name }) => {
@@ -149,9 +151,9 @@ const CommandPalette = ({ context = {}, onCommand }) => {
         setStatus('running');
         setMessage(`Ejecutando “${command.name}”…`);
         try {
-          await commandService.executeCommand(command.id, params);
+          const res = await commandService.executeCommand(command.id, params);
           setStatus('success');
-          setMessage(`“${command.name}” completado.`);
+          setMessage(res?.result?.message || `“${command.name}” completado.`);
           // Notifica al contenedor para que muestre el resultado (overlay, etc.).
           onCommand?.(command);
           setTimeout(() => setOpen(false), 900);

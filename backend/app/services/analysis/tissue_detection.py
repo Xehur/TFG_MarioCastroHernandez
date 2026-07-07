@@ -11,11 +11,10 @@ Estrategia (CV clásico, sin IA):
 - Se limpia la máscara con morfología: cierre, relleno de huecos y
   eliminación de objetos pequeños (ruido).
 
-Diseño extensible: ``TissueDetector`` define la interfaz ``detect``. La
-implementación por defecto es ``ClassicalTissueDetector``. En el futuro se
-puede añadir un ``AITissueDetector`` (modelo entrenado) que respete la misma
-interfaz y sustituirlo mediante ``get_tissue_detector`` sin tocar los
-endpoints.
+Diseño extensible: ``TissueDetector`` define la interfaz ``detect`` y
+``ClassicalTissueDetector`` (Otsu) es la implementación por defecto. Los
+endpoints usan siempre ``detect_tissue`` / ``get_tissue_detector`` sin conocer
+la implementación concreta.
 """
 from __future__ import annotations
 
@@ -159,10 +158,10 @@ _default_detector = ClassicalTissueDetector()
 
 def get_tissue_detector() -> TissueDetector:
     """
-    Devuelve el detector de tejido activo.
+    Devuelve el detector de tejido activo (clásico, basado en Otsu).
 
-    Punto único de sustitución: cuando exista un modelo de IA entrenado, aquí
-    se devolverá el ``AITissueDetector`` correspondiente.
+    Punto único de sustitución: los endpoints usan siempre ``detect_tissue`` /
+    ``get_tissue_detector`` sin conocer la implementación concreta.
     """
     return _default_detector
 

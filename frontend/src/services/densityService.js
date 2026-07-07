@@ -18,7 +18,7 @@ export const densityService = {
    */
   getMapObjectUrl: async (imageId, { gridSize = 256, colormap = 'viridis', force = false } = {}) => {
     const response = await apiClient.get(`/images/${imageId}/density-map`, {
-      params: { grid_size: gridSize, colormap, force },
+      params: { grid_size: gridSize, colormap, force, _ts: Date.now() },
       responseType: 'blob',
     });
     return URL.createObjectURL(response.data);

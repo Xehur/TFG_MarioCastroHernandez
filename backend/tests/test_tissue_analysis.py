@@ -73,6 +73,51 @@ def _patch_slide(monkeypatch):
 
 # --- Tests del algoritmo -----------------------------------------------------
 
+def test_tissue_mask_stats_include_detector_mode(client):
+    image_id, _ = _make_image_with_file(filename="tissue_mode1.svs")
+    data = client.get(f"/images/{image_id}/tissue-mask/stats").json()
+    assert data["result_data"]["detector_mode"] == "classical"
+
+
+def test_get_or_create_regenerates_when_old_ai_mask_cached(monkeypatch, tmp_path):
+    """Las máscaras del antiguo detector de IA (detector_mode != classical) se regeneran."""
+    fake_png = tmp_path / "m.png"
+    fake_png.write_bytes(b"x")
+
+    class _Cached:
+        result_data = {"mask_path": str(fake_png), "detector_mode": "ai"}
+
+    monkeypatch.setattr(tissue_service, "get_cached_result", lambda db, iid: _Cached())
+    called = {"n": 0}
+
+    def _fake_gen(*args, **kwargs):
+        called["n"] += 1
+        return "GENERATED"
+
+    monkeypatch.setattr(tissue_service, "generate_tissue_mask", _fake_gen)
+    out = tissue_service.get_or_create_tissue_mask(None, 1, "path.svs")
+    assert out == "GENERATED"
+    assert called["n"] == 1
+
+
+def test_get_or_create_uses_cache_for_classical_mask(monkeypatch, tmp_path):
+    fake_png = tmp_path / "m.png"
+    fake_png.write_bytes(b"x")
+
+    class _Cached:
+        result_data = {"mask_path": str(fake_png), "detector_mode": "classical"}
+
+    cached = _Cached()
+    monkeypatch.setattr(tissue_service, "get_cached_result", lambda db, iid: cached)
+
+    def _fail(*args, **kwargs):
+        raise AssertionError("no debería regenerar con la caché válida")
+
+    monkeypatch.setattr(tissue_service, "generate_tissue_mask", _fail)
+    out = tissue_service.get_or_create_tissue_mask(None, 1, "path.svs")
+    assert out is cached
+
+
 def test_detect_tissue_basic():
     result = tissue_detection.detect_tissue(_synthetic_slide_rgb())
     assert result.width == 120 and result.height == 120
@@ -120,6 +165,13 @@ def test_mask_to_rgba_overlay():
     assert overlay.shape == (10, 10, 4)
     assert list(overlay[3, 3]) == [1, 2, 3, 200]
     assert list(overlay[0, 0]) == [0, 0, 0, 0]
+
+
+# --- Tests del detector de tejido --------------------------------------------
+
+def test_get_tissue_detector_is_classical():
+    detector = tissue_detection.get_tissue_detector()
+    assert isinstance(detector, tissue_detection.ClassicalTissueDetector)
 
 
 # --- Tests de endpoints ------------------------------------------------------

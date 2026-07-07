@@ -258,6 +258,95 @@
   transform: scale(1.02);
 }
 
+.card-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.card-actions .view-btn {
+  flex: 1;
+}
+
+.delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 44px;
+  padding: 11px;
+  background: rgba(255, 107, 157, 0.1);
+  color: #ff8fb3;
+  border: 1px solid rgba(255, 107, 157, 0.35);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.delete-btn:hover {
+  background: rgba(255, 71, 111, 0.25);
+  border-color: #ff476f;
+  color: #fff;
+  transform: scale(1.05);
+}
+
+.delete-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.delete-confirm-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffb3c8;
+  text-align: center;
+}
+
+.delete-confirm-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.delete-cancel-btn,
+.delete-confirm-btn {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.delete-cancel-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.delete-cancel-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.delete-confirm-btn {
+  background: linear-gradient(135deg, #e0365f 0%, #ff476f 100%);
+  color: #fff;
+  border: none;
+  box-shadow: 0 8px 18px rgba(224, 54, 95, 0.35);
+}
+
+.delete-confirm-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(224, 54, 95, 0.5);
+}
+
+.delete-cancel-btn:disabled,
+.delete-confirm-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .image-list-page.error h2 {
   display: flex;
   align-items: center;

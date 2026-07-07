@@ -87,6 +87,41 @@ def test_get_image_not_found(client):
     assert "no encontrada" in response.json()["detail"].lower()
 
 
+def test_delete_image_not_found(client):
+    """Eliminar una imagen inexistente devuelve 404."""
+    response = client.delete("/images/99999")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_delete_image_forbidden(client, test_db):
+    """No se puede eliminar una imagen de otro usuario (403)."""
+    from app.models.image import Image
+
+    other = Image(
+        filename="otheruser.svs",
+        file_path="/tmp/otheruser.svs",
+        user_id=99999,
+        width=100,
+        height=100,
+        level_count=1,
+        downsamples=[1.0],
+        properties={},
+        file_size_mb=1.0,
+    )
+    test_db.add(other)
+    test_db.commit()
+    test_db.refresh(other)
+
+    response = client.delete(f"/images/{other.id}")
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_delete_image_requires_auth(anon_client):
+    """Eliminar una imagen requiere autenticación."""
+    response = anon_client.delete("/images/1")
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
 def test_upload_file_size_validation(client):
     """Test que valida el tamaño máximo de archivo"""
     # Crear un archivo muy grande (simular)

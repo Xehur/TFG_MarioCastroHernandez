@@ -99,6 +99,23 @@ export const authService = {
     authService.setStoredUser(response.data);
     return response.data;
   },
+
+  /**
+   * Actualiza el perfil del usuario autenticado (nombre, email y/o contraseña).
+   * @param {Object} data - { fullName, email, currentPassword, newPassword }
+   * Solo se envían los campos definidos.
+   */
+  updateProfile: async ({ fullName, email, currentPassword, newPassword } = {}) => {
+    const payload = {};
+    if (fullName !== undefined) payload.full_name = fullName;
+    if (email !== undefined) payload.email = email;
+    if (currentPassword !== undefined) payload.current_password = currentPassword;
+    if (newPassword !== undefined) payload.new_password = newPassword;
+
+    const response = await apiClient.patch('/auth/me', payload);
+    authService.setStoredUser(response.data);
+    return response.data;
+  },
 };
 
 export default authService;

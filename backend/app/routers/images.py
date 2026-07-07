@@ -4,6 +4,7 @@ Router para manejo de imágenes WSI
 import os
 import logging
 import io
+import shutil
 from typing import List, Dict, Any
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status
 from fastapi.responses import Response, StreamingResponse
@@ -14,6 +15,7 @@ from app.config import settings
 from app.db import SessionLocal
 from app.models.image import Image
 from app.models.user import User
+from app.models.annotation import Annotation
 from app.schemas.image import ImageResponse, ImageUploadResult, MultipleUploadResponse
 from app.services.wsi.openslide_service import OpenSlideService
 from app.services.wsi.slide_cache import slide_cache
@@ -232,7 +234,74 @@ async def get_image(
     return image
 
 
-def process_single_file(file: UploadFile, user_id: int, db: Session) -> ImageUploadResult:
+@router.delete("/{image_id}", status_code=status.HTTP_200_OK)
+async def delete_image(
+    image_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Elimina una imagen WSI del usuario autenticado.
+
+    Borra el registro en BD (con sus análisis, mapas de densidad y anotaciones
+    asociados), descarta el slide de la caché, elimina el archivo WSI del disco
+    y limpia el directorio de resultados de análisis cacheados.
+
+    Args:
+        image_id: ID de la imagen a eliminar
+        db: Sesión de base de datos
+        current_user: Usuario autenticado (debe ser el propietario)
+
+    Returns:
+        Mensaje de confirmación
+    """
+    image = db.query(Image).filter(Image.id == image_id).first()
+    if not image:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Imagen con ID {image_id} no encontrada"
+        )
+
+    if image.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para eliminar esta imagen"
+        )
+
+    file_path = image.file_path
+
+    # Las anotaciones no están cubiertas por el cascade del ORM: se borran a mano
+    # (sus análisis/mapas por annotation_id se eliminan vía cascade de la imagen).
+    db.query(Annotation).filter(Annotation.image_id == image_id).delete(
+        synchronize_session=False
+    )
+    # Cascade delete-orphan elimina analysis_results y density_maps de la imagen.
+    db.delete(image)
+    db.commit()
+
+    # Liberar el archivo de la caché antes de borrarlo del disco (Windows lo
+    # bloquea mientras OpenSlide lo mantenga abierto).
+    try:
+        slide_cache.evict(file_path)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"No se pudo descartar el slide de la caché: {e}")
+
+    if file_path and os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+        except OSError as e:
+            logger.error(f"Error eliminando archivo {file_path}: {e}")
+
+    # Limpiar directorio de resultados de análisis cacheados de la imagen.
+    analysis_dir = os.path.join(settings.UPLOAD_DIR, "analysis", str(image_id))
+    if os.path.isdir(analysis_dir):
+        try:
+            shutil.rmtree(analysis_dir, ignore_errors=True)
+        except OSError as e:
+            logger.warning(f"Error limpiando análisis de la imagen: {e}")
+
+    logger.info(f"Imagen eliminada: id={image_id}")
+    return {"message": "Imagen eliminada correctamente", "id": image_id}
     """
     Procesa un archivo individual y retorna el resultado
     

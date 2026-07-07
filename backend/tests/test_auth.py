@@ -118,3 +118,70 @@ def test_protected_users_requires_auth(anon_client):
     """El listado de usuarios requiere autenticación."""
     resp = anon_client.get("/users/")
     assert resp.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def _register_and_headers(anon_client, email, password="secret123", full_name="U"):
+    reg = anon_client.post(
+        "/auth/register",
+        json={"email": email, "password": password, "full_name": full_name},
+    )
+    token = reg.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_update_profile_name_and_email(anon_client):
+    """PATCH /auth/me actualiza nombre y email."""
+    headers = _register_and_headers(anon_client, "edit@example.com")
+    resp = anon_client.patch(
+        "/auth/me",
+        headers=headers,
+        json={"full_name": "Nuevo Nombre", "email": "edited@example.com"},
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    data = resp.json()
+    assert data["full_name"] == "Nuevo Nombre"
+    assert data["email"] == "edited@example.com"
+
+
+def test_update_profile_email_conflict(anon_client):
+    """No se puede cambiar el email a uno ya registrado por otro usuario."""
+    _register_and_headers(anon_client, "taken@example.com")
+    headers = _register_and_headers(anon_client, "mover@example.com")
+    resp = anon_client.patch(
+        "/auth/me", headers=headers, json={"email": "taken@example.com"}
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_update_password_wrong_current(anon_client):
+    """Cambiar contraseña con la actual incorrecta devuelve 400."""
+    headers = _register_and_headers(anon_client, "pw1@example.com", password="original123")
+    resp = anon_client.patch(
+        "/auth/me",
+        headers=headers,
+        json={"current_password": "incorrecta", "new_password": "nuevapass123"},
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_update_password_success(anon_client):
+    """Cambio de contraseña correcto permite iniciar sesión con la nueva."""
+    headers = _register_and_headers(anon_client, "pw2@example.com", password="original123")
+    resp = anon_client.patch(
+        "/auth/me",
+        headers=headers,
+        json={"current_password": "original123", "new_password": "nuevapass123"},
+    )
+    assert resp.status_code == status.HTTP_200_OK
+
+    login = anon_client.post(
+        "/auth/login",
+        json={"email": "pw2@example.com", "password": "nuevapass123"},
+    )
+    assert login.status_code == status.HTTP_200_OK
+
+
+def test_update_profile_requires_auth(anon_client):
+    """PATCH /auth/me sin token devuelve 401."""
+    resp = anon_client.patch("/auth/me", json={"full_name": "X"})
+    assert resp.status_code == status.HTTP_401_UNAUTHORIZED

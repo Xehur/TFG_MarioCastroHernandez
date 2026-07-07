@@ -19,8 +19,10 @@ from app.models.analysis import AnalysisResult, DensityMap
 
 config = context.config
 
-if config.get_main_option("sqlalchemy.url") is None or config.get_main_option("sqlalchemy.url") == "":
-    config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# La URL de la BD siempre se toma de la configuración de la app (settings), que a
+# su vez lee la variable de entorno DATABASE_URL. Esto permite que en Docker las
+# migraciones apunten al servicio de PostgreSQL sin editar alembic.ini.
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 fileConfig(config.config_file_name)
 

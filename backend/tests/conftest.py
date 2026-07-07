@@ -156,19 +156,34 @@ def mock_large_file() -> UploadFile:
 @pytest.fixture(autouse=True)
 def cleanup_uploads():
     """
-    Fixture que limpia archivos de prueba del directorio uploads después de cada test
+    Fixture que limpia archivos de prueba del directorio uploads después de cada test.
+
+    Los tests crean ficheros .svs falsos de unos pocos bytes con nombres muy
+    variados (ai_img*, density_test*, rt_test*, tissue_*, ann_analysis*,
+    cmd_exec*, test*, ...). Para no dejar basura en uploads, se eliminan todos
+    los .svs pequeños (los WSI reales pesan MB), preservando las imágenes reales.
     """
     yield
-    
-    # Limpiar archivos de test después de ejecutar
-    if os.path.exists(settings.UPLOAD_DIR):
-        for filename in os.listdir(settings.UPLOAD_DIR):
-            if filename.startswith("test") or filename.startswith("large_test"):
-                filepath = os.path.join(settings.UPLOAD_DIR, filename)
-                try:
-                    os.remove(filepath)
-                except Exception:
-                    pass  # Ignorar errores de limpieza
+
+    if not os.path.exists(settings.UPLOAD_DIR):
+        return
+
+    _FAKE_SVS_MAX_BYTES = 1024  # los WSI reales pesan MB; los fakes de test, bytes
+
+    for filename in os.listdir(settings.UPLOAD_DIR):
+        filepath = os.path.join(settings.UPLOAD_DIR, filename)
+        if not os.path.isfile(filepath):
+            continue
+        try:
+            is_prefixed = filename.startswith("test") or filename.startswith("large_test")
+            is_small_fake_svs = (
+                filename.lower().endswith(".svs")
+                and os.path.getsize(filepath) < _FAKE_SVS_MAX_BYTES
+            )
+            if is_prefixed or is_small_fake_svs:
+                os.remove(filepath)
+        except Exception:
+            pass  # Ignorar errores de limpieza
 
 
 @pytest.fixture

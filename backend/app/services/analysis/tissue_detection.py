@@ -152,7 +152,7 @@ class ClassicalTissueDetector(TissueDetector):
         background = np.clip(
             np.percentile(rgb.reshape(-1, 3), 99, axis=0), 0.85, 1.0
         )
-        # OD máxima entre canales (el tejido rosa pálido absorbe sobre todo en
+        # OD máxima entre canales (el tejido rosa pálido absorbe sobre especialmente en
         # un canal). Ojo a la precedencia: primero -log10, después max.
         od = (-np.log10(np.clip(rgb / background, 1e-3, 1.0))).max(axis=-1)
 

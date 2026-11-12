@@ -443,7 +443,7 @@ def test_overlay_cubre_todo_el_tejido_y_nada_del_cristal():
         _FakeSlide("x"), (0, 0, 40000, 30000), rgb, mask, max_patches=5000
     )
     painted = result["overlay"][..., 3] > 0
-    assert painted[mask].all()       # todo el tejido coloreado
+    assert painted[mask].all()       # el tejido coloreado
     assert not painted[~mask].any()  # nada fuera del tejido
     assert result["inferred_cells"] > 0  # celdas de borde rellenadas
 

@@ -353,6 +353,7 @@ def get_analytics(
             width=image.width or 0,
             height=image.height or 0,
             spatial_bins=spatial_bins,
+            mpp=analytics_service.image_mpp(image.properties),
         )
     except Exception as exc:  # noqa: BLE001
         logger.error(f"Error generando analíticas: {exc}")
@@ -635,6 +636,9 @@ def get_image_ai_classification(
             db, image_id, image.file_path
         )
         png_bytes = ai_classification_service.load_map_png_bytes(analysis)
+    except ai_classification_service.ModelUnavailableError as exc:
+        logger.error(f"Modelo de IA no disponible: {exc}")
+        raise HTTPException(status_code=503, detail=str(exc))
     except Exception as exc:  # noqa: BLE001
         logger.error(f"Error en clasificación IA de imagen: {exc}")
         raise HTTPException(
@@ -664,6 +668,9 @@ def get_image_ai_classification_stats(
         return ai_classification_service.get_or_create_image_classification(
             db, image_id, image.file_path, force=force
         )
+    except ai_classification_service.ModelUnavailableError as exc:
+        logger.error(f"Modelo de IA no disponible: {exc}")
+        raise HTTPException(status_code=503, detail=str(exc))
     except Exception as exc:  # noqa: BLE001
         logger.error(f"Error en clasificación IA de imagen: {exc}")
         raise HTTPException(
@@ -688,6 +695,9 @@ def analyze_image_ai(
         return ai_classification_service.generate_image_classification(
             db, image_id, image.file_path
         )
+    except ai_classification_service.ModelUnavailableError as exc:
+        logger.error(f"Modelo de IA no disponible: {exc}")
+        raise HTTPException(status_code=503, detail=str(exc))
     except Exception as exc:  # noqa: BLE001
         logger.error(f"Error en clasificación IA de imagen: {exc}")
         raise HTTPException(
@@ -714,6 +724,9 @@ def get_annotation_ai_classification(
             db, annotation, image.file_path
         )
         png_bytes = ai_classification_service.load_map_png_bytes(analysis)
+    except ai_classification_service.ModelUnavailableError as exc:
+        logger.error(f"Modelo de IA no disponible: {exc}")
+        raise HTTPException(status_code=503, detail=str(exc))
     except Exception as exc:  # noqa: BLE001
         logger.error(f"Error en clasificación IA de anotación: {exc}")
         raise HTTPException(
@@ -742,6 +755,9 @@ def get_annotation_ai_classification_stats(
         return ai_classification_service.get_or_create_annotation_classification(
             db, annotation, image.file_path, force=force
         )
+    except ai_classification_service.ModelUnavailableError as exc:
+        logger.error(f"Modelo de IA no disponible: {exc}")
+        raise HTTPException(status_code=503, detail=str(exc))
     except Exception as exc:  # noqa: BLE001
         logger.error(f"Error en clasificación IA de anotación: {exc}")
         raise HTTPException(
@@ -765,6 +781,9 @@ def analyze_annotation_ai(
         return ai_classification_service.generate_annotation_classification(
             db, annotation, image.file_path
         )
+    except ai_classification_service.ModelUnavailableError as exc:
+        logger.error(f"Modelo de IA no disponible: {exc}")
+        raise HTTPException(status_code=503, detail=str(exc))
     except Exception as exc:  # noqa: BLE001
         logger.error(f"Error en clasificación IA de anotación: {exc}")
         raise HTTPException(

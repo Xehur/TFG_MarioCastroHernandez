@@ -158,3 +158,76 @@ def test_validation_functions():
     assert validate_file_extension("test.png") == False
     assert validate_file_extension("test.pdf") == False
     assert validate_file_extension("test.txt") == False
+
+
+# --- Nombres duplicados: únicos por usuario, no globales ---------------------
+
+def _add_image(test_db, filename, user_id):
+    from app.models.image import Image
+
+    img = Image(
+        filename=filename,
+        file_path=f"/tmp/{user_id}/{filename}",
+        user_id=user_id,
+        width=100,
+        height=100,
+        level_count=1,
+        downsamples=[1.0],
+        properties={},
+        file_size_mb=1.0,
+    )
+    test_db.add(img)
+    test_db.commit()
+    return img
+
+
+def _current_user_id(client):
+    return client.get("/auth/me").json()["id"]
+
+
+def test_mismo_nombre_que_otro_usuario_no_es_duplicado(client, test_db):
+    """Un archivo con el mismo nombre que la imagen de OTRO usuario se acepta."""
+    _add_image(test_db, "compartido.svs", user_id=99999)
+    files = {"file": ("compartido.svs", io.BytesIO(b"fake"), "application/octet-stream")}
+
+    response = client.post("/images/upload", files=files)
+
+    # No es 409: el archivo falso falla después, al leerlo con OpenSlide.
+    assert response.status_code != status.HTTP_409_CONFLICT
+
+
+def test_mismo_nombre_mismo_usuario_es_duplicado(client, test_db):
+    _add_image(test_db, "propio.svs", user_id=_current_user_id(client))
+    files = {"file": ("propio.svs", io.BytesIO(b"fake"), "application/octet-stream")}
+
+    response = client.post("/images/upload", files=files)
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+
+
+def test_subida_multiple_duplicado_solo_del_mismo_usuario(client, test_db):
+    _add_image(test_db, "ajeno.svs", user_id=99999)
+    _add_image(test_db, "mio.svs", user_id=_current_user_id(client))
+    files = [
+        ("files", ("ajeno.svs", io.BytesIO(b"fake"), "application/octet-stream")),
+        ("files", ("mio.svs", io.BytesIO(b"fake"), "application/octet-stream")),
+    ]
+
+    results = {
+        r["filename"]: r for r in client.post("/images/upload-multiple", files=files).json()["results"]
+    }
+
+    assert results["ajeno.svs"]["message"] != "Archivo ya existe"
+    assert results["mio.svs"]["message"] == "Archivo ya existe"
+
+
+def test_user_upload_path_separa_por_usuario():
+    from app.config import settings
+    from app.routers.images import user_upload_path
+
+    a = user_upload_path(1, "x.svs")
+    b = user_upload_path(2, "x.svs")
+    assert a != b
+    assert os.path.dirname(a) == os.path.join(settings.UPLOAD_DIR, "1")
+    # No se permite escapar de la carpeta con rutas en el nombre.
+    assert user_upload_path(1, "../../evil.svs") == os.path.join(settings.UPLOAD_DIR, "1", "evil.svs")

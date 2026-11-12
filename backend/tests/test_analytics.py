@@ -202,3 +202,97 @@ def test_analytics_requires_auth(anon_client):
     image_id = _make_image(filename="analytics_auth.svs")
     resp = anon_client.get(f"/images/{image_id}/analytics")
     assert resp.status_code in (401, 403)
+
+
+# --- Métricas legibles (superficie, densidad por niveles, IA, imagen) ---------
+
+def test_metricas_fisicas_y_niveles_de_densidad(client):
+    """Con µm/px conocido, el dashboard recibe superficies en mm², el reparto de
+    densidad baja/media/alta y la información física de la imagen."""
+    db = _session()
+    try:
+        image = Image(
+            filename="analytics_mm.svs", file_path="/tmp/analytics_mm.svs", user_id=1,
+            width=40000, height=20000, level_count=1,
+            properties={"openslide.mpp-x": "0.25"},
+        )
+        db.add(image)
+        db.commit()
+        db.refresh(image)
+        image_id = image.id
+        # Miniatura 400x200 (escala 100): cada px = 25 µm -> 6.25e-4 mm².
+        db.add(AnalysisResult(
+            image_id=image_id, analysis_type="tissue_mask",
+            result_data={"tissue_percent": 50.0, "width": 400, "height": 200,
+                         "scale": 100.0, "fragments": 2,
+                         "fragment_areas_px": [30000, 10000]},
+        ))
+        db.add(DensityMap(
+            image_id=image_id, grid_size=256,
+            density_data={"matrix": [[0.0, 0.1], [0.5, 0.9]]},
+        ))
+        db.commit()
+    finally:
+        db.close()
+
+    _create_annotation(client, image_id, {
+        "shape_type": "rectangle",
+        "coordinates": {"x": 0, "y": 0, "width": 4000, "height": 4000},  # 1 mm²
+        "color": "#8e2de2",
+    })
+
+    data = client.get(f"/images/{image_id}/analytics").json()
+    info = data["image_info"]
+    assert info["width_mm"] == 10.0 and info["height_mm"] == 5.0
+    assert info["magnification"] == 40
+    assert data["tissue"]["area_mm2"] == 25.0       # 40000 px * 6.25e-4
+    assert data["tissue"]["fragments"] == 2
+    assert data["tissue"]["fragment_areas_mm2"] == [18.75, 6.25]
+    assert data["annotated_area_mm2"] == 1.0
+    assert data["by_class"][0]["area_mm2"] == 1.0
+    levels = {lv["level"]: lv["count"] for lv in data["density_levels"]["levels"]}
+    assert levels == {"Baja": 1, "Media": 1, "Alta": 1}  # el 0.0 (sin tejido) no cuenta
+    assert data["ai"] is None  # sin clasificación IA calculada
+
+
+def test_resumen_ia_si_existe_clasificacion(client):
+    from app.services.analysis import ai_classification_service as ai
+    from app.services.analysis.inception_classifier import MODEL_ID, PREPROCESSING_VERSION
+    from app.services.analysis.tissue_detection import DETECTOR_VERSION
+
+    image_id = _make_image(filename="analytics_ai.svs")
+    classes = [
+        {"code": "BENIGN", "name": "Benigno", "color": [59, 130, 246], "count": 2, "percent": 20.0},
+        {"code": "INSITU", "name": "Carcinoma in situ", "color": [245, 158, 11], "count": 1, "percent": 10.0},
+        {"code": "INVASIVE", "name": "Carcinoma invasivo", "color": [220, 38, 38], "count": 6, "percent": 60.0},
+        {"code": "NORMAL", "name": "Normal", "color": [34, 197, 94], "count": 1, "percent": 10.0},
+    ]
+    db = _session()
+    try:
+        db.add(AnalysisResult(
+            image_id=image_id, analysis_type=ai.AI_ANALYSIS_TYPE,
+            result_data={
+                "model": {"id": MODEL_ID, "preprocessing_version": PREPROCESSING_VERSION,
+                          "dataset": "BACH"},
+                "tissue_detector_version": DETECTOR_VERSION,
+                "classes": classes, "dominant_class": "INVASIVE", "tissue_patches": 10,
+                "mean_confidence": 0.81, "sampling": {"tissue_cells": 10},
+            },
+        ))
+        db.commit()
+    finally:
+        db.close()
+
+    summary = client.get(f"/images/{image_id}/analytics").json()["ai"]
+    assert summary["dominant_name"] == "Carcinoma invasivo"
+    assert summary["dominant_percent"] == 60.0
+    assert summary["carcinoma_percent"] == 70.0
+    assert summary["analyzed_fields"] == 10
+
+
+def test_area_de_anotaciones():
+    assert analytics_service.annotation_area_px("rectangle", {"width": 10, "height": 5}) == 50
+    assert analytics_service.annotation_area_px(
+        "polygon", {"points": [[0, 0], [10, 0], [10, 10], [0, 10]]}
+    ) == 100
+    assert round(analytics_service.annotation_area_px("circle", {"radius": 1}), 4) == 3.1416

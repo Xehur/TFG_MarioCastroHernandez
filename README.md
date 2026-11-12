@@ -45,7 +45,7 @@ Objetivos funcionales principales:
 - Anotaciones (rectángulo, círculo, polígono) con clases configurables.
 - Detección automática de tejido frente a fondo.
 - Generación de mapas de densidad de tejido.
-- Clasificación del tejido por IA en categorías histológicas.
+- Clasificación del tejido mamario por IA (Normal, Benigno, In situ, Invasivo).
 - Importación y exportación de anotaciones en formato COCO.
 - Dashboard de analíticas y paleta de comandos.
 - Autenticación de usuarios y gestión de la cuenta.
@@ -102,11 +102,10 @@ El sistema sigue una arquitectura cliente-servidor clásica de tres capas:
 | OpenSlide (openslide-python / openslide-bin) | Lectura de WSI y pirámides Deep Zoom |
 | Pillow | Manipulación de imágenes |
 | NumPy / SciPy | Cálculo numérico |
-| scikit-image | Visión por computador clásica (Otsu, morfología, HSV) |
+| scikit-image | Visión por computador clásica (densidad óptica, Otsu, histéresis, morfología) |
 | Matplotlib | Colormaps de los heatmaps de densidad |
 | PyTorch 2.x | Motor de inferencia del modelo de IA |
-| timm | Carga de la arquitectura ResNet18 y del modelo preentrenado |
-| safetensors / huggingface_hub | Descarga y carga de los pesos del modelo desde Hugging Face |
+| torchvision | Arquitectura InceptionV3 y transformaciones de preprocesado |
 | passlib + bcrypt | Hashing de contraseñas |
 | python-jose | Tokens JWT |
 | pytest / pytest-asyncio / httpx | Pruebas |
@@ -160,7 +159,8 @@ backend/app/
       tissue_service.py          # Orquestación + cacheo del análisis de tejido
       density_generation.py      # Cálculo del mapa de densidades por celdas
       density_service.py         # Orquestación + cacheo del mapa de densidades
-      ai_classification_service.py  # Clasificación por IA (ResNet18)
+      ai_classification_service.py  # Clasificación por IA (rejilla, overlay, caché)
+      inception_classifier.py       # Carga e inferencia de InceptionV3 (4 clases)
       annotation_analysis_service.py # Análisis restringido a una anotación
     commands/
       command_registry.py   # Catálogo de comandos de la paleta
@@ -187,7 +187,8 @@ Tablas principales (SQLAlchemy / PostgreSQL):
 
 - **users**: `id`, `email` (único), `full_name`, `hashed_password`, `is_active`,
   `created_at`, `updated_at`.
-- **images**: `id`, `filename` (único), `file_path` (ruta en disco, no binario),
+- **images**: `id`, `filename` (único por usuario), `file_path` (ruta en disco, no binario:
+  `uploads/<user_id>/<nombre>`),
   `user_id`, metadatos WSI (`width`, `height`, `level_count`, `downsamples`,
   `properties`), `file_size_mb`, timestamps. Relación en cascada con
   `analysis_results` y `density_maps`.
@@ -229,28 +230,44 @@ al cambiar de zoom).
 
 ## 7. Detección de tejido (visión por computador clásica)
 
-Objetivo: separar el **tejido teñido** del **fondo** (típicamente blanco/gris claro del
-cristal del portaobjetos). Se resuelve con visión por computador clásica, **sin IA**,
-porque resulta más robusta y precisa que un modelo aprendido para esta tarea concreta
-de segmentación gruesa.
+Objetivo: separar el **tejido teñido** del **fondo** (el cristal del portaobjetos,
+blanco o gris claro). Se resuelve con visión por computador clásica, **sin IA**,
+porque para esta segmentación gruesa resulta más robusta que un modelo aprendido.
 
 Técnica (`ClassicalTissueDetector`, en `tissue_detection.py`):
 
-1. Se trabaja sobre una **miniatura** de la imagen (o de la región de una anotación),
-   no sobre la WSI completa.
-2. **Umbral de Otsu sobre el canal de saturación (HSV)**: el tejido teñido (H&E u
-   otras tinciones) presenta mayor saturación de color que el fondo.
-3. **Umbral de Otsu sobre la intensidad (escala de grises)**: el tejido es más oscuro
-   que el fondo claro.
-4. **Combinación**: un píxel se considera tejido si tiene suficiente color O es
-   notablemente oscuro (`mask_saturación OR mask_intensidad`).
-5. **Limpieza morfológica**: cierre (`closing`) para unir regiones cercanas, relleno
-   de huecos internos (`remove_small_holes`) y eliminación de objetos pequeños
-   (`remove_small_objects`) para descartar ruido.
+1. Se trabaja sobre una **miniatura** de la imagen (o de la región de una
+   anotación), no sobre la WSI completa.
+2. **Densidad óptica (OD) respecto al cristal**: se estima el color del cristal
+   (percentil 99 de cada canal) y se calcula `OD = -log10(I / I_fondo)`. El cristal
+   tiene OD ≈ 0 y cualquier tinción, aunque sea pálida, tiene OD > 0.
+3. **Umbral con histéresis**:
+   - *Fuerte*: Otsu sobre la OD (recortada al percentil 99,5 para que unos pocos
+     píxeles extremos no lo desplacen). Marca el tejido claramente teñido.
+   - *Débil*: justo por encima del ruido del cristal (mediana + 6·MAD de la OD
+     del fondo, mínimo 0,035) o con algo de color (saturación > 0,08).
+   - Se conservan las regiones débiles **conectadas** a alguna región fuerte.
+     Así se recupera el tejido pálido (grasa, estroma laxo, eosina clara), que un
+     único umbral de Otsu dejaba fuera, sin aceptar manchas aisladas del cristal.
+4. **Artefactos**:
+   - *Tinta de rotulador* (tonos amarillo-verde-cian, fuera de la gama H&E): se
+     excluye, incluidas sus zonas pálidas.
+   - *Franjas del escáner*: se eliminan las franjas finas pegadas a un borde de la
+     imagen, aunque toquen el tejido; la punta de tejido que entra en ellas se
+     conserva.
+5. **Limpieza morfológica**: cierre, relleno de huecos interiores (vacuolas de
+   grasa) y eliminación de objetos pequeños, con tamaños relativos al área de la
+   miniatura.
 
-El resultado incluye la máscara binaria, el porcentaje de tejido y los umbrales
-calculados. La máscara se convierte en un overlay RGBA semitransparente (verde por
-defecto) que se superpone sobre la imagen en el visor.
+El resultado incluye la máscara binaria, el porcentaje de tejido, los umbrales de
+OD, el color estimado del cristal y el porcentaje de tinta excluida. La máscara se
+convierte en un overlay RGBA semitransparente (verde por defecto) que se
+superpone sobre la imagen en el visor. Tarda menos de 1 s con la miniatura de
+2048 px.
+
+Cada resultado guarda `detector_version`. Las máscaras, los mapas de densidad y
+las clasificaciones IA generados con otra versión del detector se regeneran
+automáticamente.
 
 Nota de diseño: existió una variante experimental de detección de tejido por IA que se
 descartó por segmentar peor que el método clásico. La IA se reserva exclusivamente
@@ -279,67 +296,84 @@ El heatmap se cachea en disco (PNG) y la matriz con sus metadatos en la tabla
 
 ## 9. Clasificación de tejido con Inteligencia Artificial
 
+> **Uso académico / de investigación.** Las predicciones no constituyen un
+> diagnóstico clínico y la confianza softmax no está calibrada.
+
 ### 9.1 Qué modelo se usa y de dónde viene
 
-- **Modelo**: `1aurent/resnet18.tiatoolbox-kather100k`, alojado en Hugging Face y
-  cargado mediante la librería `timm` (identificador
-  `hf-hub:1aurent/resnet18.tiatoolbox-kather100k`).
-- **Arquitectura**: **ResNet18** (red neuronal convolucional residual de 18 capas).
-- **Origen / procedencia**: es un modelo de **TIAToolbox** (The Tissue Image Analytics
-  toolbox, del grupo de investigación en análisis de imagen de tejido de la
-  Universidad de Warwick), republicado en Hugging Face en formato `timm`/safetensors.
-- **Dataset de entrenamiento**: **NCT-CRC-HE-100K** (conocido como "kather100k"), un
-  conjunto de ~100.000 parches de 224x224 px de histología de cáncer colorrectal
-  teñida con Hematoxilina-Eosina (H&E). Licencia CC-BY-4.0.
+- **Arquitectura**: **InceptionV3** (`torchvision.models.inception_v3`) con las
+  capas de salida principal y auxiliar sustituidas por capas de 4 clases.
+- **Entrenamiento**: *fine-tuning* propio a partir de los pesos de ImageNet
+  (`InceptionV3/src/finetune.py`) sobre las fotos del dataset **BACH (ICIAR 2018)**
+  de tejido mamario teñido con H&E.
+- **Pesos**: `InceptionV3/HE_inceptionv3.pth` (`state_dict`, 97,8 MB, SHA-256
+  `42515436…394a5e`). No se versiona en Git; la ruta es configurable con
+  `INCEPTION_WEIGHTS_PATH`. Se carga con `torch.load(weights_only=True)`.
+- **Métricas de referencia** (`InceptionV3/metricas.txt`): exactitud 0,88 sobre 610
+  imágenes de validación aleatoria (no separada por paciente, y con la misma
+  transformación en entrenamiento y validación por compartir el `ImageFolder`).
+  No equivale al rendimiento sobre WSI completas.
 
 ### 9.2 Qué clasifica
 
-El modelo clasifica cada parche en **9 categorías histológicas** (orden exacto del
-modelo): `BACK` (fondo), `NORM` (mucosa normal), `DEB` (debris/necrosis), `TUM`
-(tumoral / epitelio de adenocarcinoma), `ADI` (tejido adiposo), `MUC` (moco), `MUS`
-(músculo liso), `STR` (estroma), `LYM` (linfocitos).
+El modelo clasifica cada campo en **4 categorías** (orden exacto de salida):
+`BENIGN` (Benigno), `INSITU` (Carcinoma in situ), `INVASIVE` (Carcinoma invasivo)
+y `NORMAL` (Normal). Cada clase es su propio grupo de presentación, con un color
+único compartido por overlay, leyenda y barras.
 
-Para la presentación al usuario, esas 9 clases finas se agrupan en **5 categorías de
-alto nivel**: **Tumoral, Estroma, No tumoral, Necrosis y Fondo**. El overlay pintado
-sobre la imagen, la leyenda y las barras del resumen usan siempre el color del grupo,
-de modo que lo que se ve sobre la imagen coincide exactamente con la leyenda.
+"Fondo / no analizado" **no es una salida de la red**: identifica las celdas sin
+tejido suficiente, que se excluyen de la inferencia y quedan transparentes.
 
-### 9.3 Cómo se aplica (muestreo consciente de la magnificación)
+### 9.3 Preprocesado y escala
 
-Este es el punto técnicamente más delicado. El modelo fue entrenado con parches de
-**224 x 224 px a ~0.5 µm/px (magnificación 20x)**. Si se le entregan parches a otra
-escala, sus predicciones dejan de ser fiables.
+- Preprocesado idéntico a la validación del entrenamiento:
+  `RGB → Resize(299×299) → ToTensor → Normalize(ImageNet)`, con
+  `transform_input=True`. Este último detalle importa: al crear el modelo con
+  pesos de ImageNet, torchvision lo activa de forma implícita, mientras que
+  `InceptionV3/src/inference.py` lo deja desactivado y no reproduce el
+  entrenamiento.
+- Las fotos de BACH miden 2048×1536 px a ≈0,42 µm/px (≈860×645 µm). En la WSI,
+  cada celda de la rejilla lee **un campo real de ese mismo tamaño físico**
+  (`OpenSlideService.read_field_rgb`, nivel de pirámide adecuado), que el
+  clasificador reduce a 299×299 igual que en el entrenamiento. Tamaño y MPP
+  configurables con `AI_FIELD_MPP`, `AI_FIELD_WIDTH_PX` y `AI_FIELD_HEIGHT_PX`.
+  Si la WSI no expone `openslide.mpp-x`, se asume 0,5 µm/px y se indica en el
+  resultado (`sampling.mpp_source = "default"`).
 
-Estrategia implementada en `ai_classification_service.py`
-(`classify_slide_region`):
+### 9.4 Flujo (`ai_classification_service.py`)
 
-1. Se calcula la magnificación real de la WSI mediante los metadatos
-   (`openslide.mpp-x`); si no existen, se asume 0.5 µm/px.
-2. Se determina el tamaño del parche en píxeles de nivel 0 necesario para representar
-   224 px **a la magnificación objetivo de 0.5 MPP** (`patch_px = 224 * (0.5 / mpp)`).
-3. La región a clasificar (imagen completa o bounding box de una anotación) se cubre
-   con una rejilla de celdas.
-4. Cada celda se filtra con la **máscara de tejido clásica**: si no contiene tejido
-   suficiente (umbral configurable), se descarta sin inferencia.
-5. Para las celdas con tejido se lee un **parche REAL de 224x224 a 0.5 MPP**
-   directamente de la WSI (`OpenSlideService.read_patch_rgb`, que escoge el nivel de la
-   pirámide adecuado), en lugar de aplastar una miniatura.
-6. Los parches se clasifican en lotes con PyTorch; se aplica softmax y argmax para
-   obtener clase y confianza por celda.
-7. Se construye un overlay RGBA (mapa de clases) a la resolución de la miniatura y un
-   resumen de distribución por clase y por grupo.
+1. Miniatura de la imagen (o de la región anotada) y máscara de tejido clásica.
+2. Rejilla **densa** de celdas del tamaño exacto del campo (una celda = un campo).
+3. Solo las celdas con al menos `AI_MIN_TISSUE_FRAC` (35 %) de tejido se
+   clasifican: el presupuesto nunca se gasta en fondo. Si superan
+   `AI_MAX_PATCHES` (1000 por defecto), se elige un subconjunto repartido
+   uniformemente **entre las celdas de tejido**, y las no evaluadas se pintan en el
+   overlay de forma atenuada con la clase del campo evaluado más cercano (no
+   cuentan en las estadísticas).
+4. Los campos se leen de la WSI en paralelo (`AI_READ_WORKERS`, 4 hilos) y se
+   clasifican por bloques (`inception_classifier.py`, `predict_batch → (N, 4)`),
+   con la memoria acotada.
+5. Overlay RGBA por clase y resumen: distribución por clase, clase dominante,
+   confianza media, probabilidades medias y **cobertura** (`sampling`: celdas con
+   tejido, analizadas, inferidas, fracción cubierta, tamaño del campo en µm y si
+   el campo excede la región anotada).
 
-Ventaja clave: **la imagen completa y una región anotada se clasifican a la misma
-magnificación** que la de entrenamiento, por lo que los resultados son coherentes
-entre ambos ámbitos. En imágenes muy grandes se acota el número de parches muestreando
-celdas representativas, manteniendo siempre la magnificación correcta.
+Los porcentajes son **de campos evaluados**, no de superficie. En anotaciones
+más pequeñas que un campo (~0,86 mm), el campo incluye contexto exterior a la
+región (`sampling.field_exceeds_region = true`).
 
-### 9.4 Consideraciones de hardware
+### 9.5 Caché y versionado
 
-El modelo (ResNet18) es ligero y se ejecuta cómodamente en **CPU**, por lo que no
-requiere GPU. La inferencia es perezosa: el modelo se carga la primera vez que se usa
-y se cachea en memoria del proceso. Los pesos se descargan automáticamente de Hugging
-Face en el primer arranque.
+Cada resultado guarda `model.id`, `preprocessing_version`, el hash de los pesos y
+los parámetros de muestreo. Un resultado de otro modelo (por ejemplo, del ResNet18
+anterior) no se sirve: se regenera automáticamente.
+
+### 9.6 Hardware
+
+La inferencia se ejecuta en **CPU** (≈40–50 ms por campo con torch 2.12 CPU, lectura incluida). El
+modelo se carga una vez por proceso, de forma perezosa. `AI_DEVICE` queda
+preparado para añadir aceleración en la GPU AMD (DirectML / ONNX Runtime) en una
+fase posterior. Si faltan los pesos, los endpoints de IA responden **503**.
 
 ---
 
@@ -379,8 +413,22 @@ por computador y de anotación de imagen médica.
   densidades, clasificar con IA, abrir el dashboard, alternar overlays, exportar/
   importar COCO, seleccionar herramientas de dibujo, navegar). El catálogo se define en
   `command_registry.py` y se ejecuta desde `command_executor.py`.
-- **Dashboard de analíticas**: agrega métricas de los análisis realizados y las
-  presenta con gráficos (Recharts) en el frontend.
+- **Dashboard de analíticas**: agrega métricas de los análisis ya realizados (no
+  ejecuta análisis pesados, salvo que se pida la clasificación IA) y las presenta
+  con gráficos (Recharts) exportables a PNG/SVG, priorizando datos fáciles de
+  interpretar:
+  - **Resumen**: superficie de tejido en mm² (y % de la imagen), nº de fragmentos
+    de tejido, clase IA predominante, % de tejido con patrón de carcinoma
+    (in situ + invasivo) y nº/área de anotaciones.
+  - **Clasificación IA**: proporción y superficie aproximada de cada clase
+    (Normal → Benigno → In situ → Invasivo), campos analizados y confianza media.
+  - **Densidad del tejido**: zonas con tejido de densidad baja, media y alta.
+  - **Fragmentos de tejido**: superficie de cada pieza (p. ej. cilindros de biopsia).
+  - **Anotaciones por clase**: número y área anotada de cada clase.
+  - **Información de la imagen**: tamaño en mm, µm/px y aumento aproximado.
+
+  Las superficies usan la resolución física de la WSI (`openslide.mpp-x`); si la
+  imagen no la tiene, se muestran porcentajes.
 
 ---
 
@@ -593,10 +641,14 @@ instrucciones adicionales de arranque.
   imagen. 0.5 MPP equivale aproximadamente a 20x.
 - **Otsu**: método automático de umbralización que separa dos poblaciones de
   intensidad (aquí, tejido frente a fondo).
+- **Densidad óptica (OD)**: `-log10(I / I_fondo)`; mide cuánta luz absorbe la
+  tinción respecto al cristal.
+- **Histéresis**: umbral doble; los píxeles por encima del umbral débil se aceptan
+  solo si están conectados a píxeles por encima del umbral fuerte.
 - **H&E**: tinción de Hematoxilina-Eosina, la más común en histopatología.
-- **ResNet18**: arquitectura de red neuronal convolucional residual de 18 capas.
-- **NCT-CRC-HE-100K / kather100k**: dataset de ~100.000 parches de histología
-  colorrectal H&E usado para entrenar el clasificador de IA.
+- **InceptionV3**: arquitectura convolucional con módulos *Inception* y entrada de 299×299 px.
+- **BACH (ICIAR 2018)**: dataset de fotos de histología mamaria H&E en 4 clases
+  (Normal, Benigno, In situ, Invasivo) usado para entrenar el clasificador de IA.
 - **COCO**: formato estándar de representación de anotaciones de imagen.
 - **JWT**: JSON Web Token, mecanismo de autenticación basado en tokens firmados.
 - **Overlay**: capa RGBA semitransparente que se superpone sobre la imagen para mostrar

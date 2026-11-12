@@ -1,41 +1,40 @@
 """
-Servicio de clasificación de tejido por IA (Sprint 7).
+Servicio de clasificación de tejido por IA.
 
-Ejecuta un modelo de deep learning pre-entrenado (ResNet18 de TIAToolbox sobre
-el dataset NCT-CRC-HE-100K / "kather100k", CC-BY-4.0) para clasificar el tejido
-de una WSI (o de una región anotada) en 9 categorías histológicas, y las agrupa
-en las categorías de alto nivel de interés (tumoral, estroma, no tumoral,
-necrosis, fondo).
+Ejecuta el modelo InceptionV3 entrenado sobre tejido mamario H&E (dataset BACH /
+ICIAR 2018) para clasificar el tejido de una WSI (o de una región anotada) en 4
+categorías: Normal, Benigno, Carcinoma in situ y Carcinoma invasivo. Las celdas
+sin tejido suficiente se marcan como "Fondo / no analizado" (no es una salida
+de la red).
 
 Estrategia (memoria y CPU contenidas):
 - Se trabaja sobre una miniatura (imagen completa) o la región de la anotación,
   igual que la detección de tejido / mapa de densidades, para no cargar la WSI
-  entera en memoria.
-- La imagen se divide en una rejilla de celdas; cada celda con suficiente tejido
-  (según la máscara de tejido clásica) se redimensiona a 224x224 y se clasifica
-  en lotes. Las celdas de fondo se etiquetan como "BACK" sin inferencia.
-- Se genera un overlay RGBA (mapa de clases) coloreado por celda y un resumen de
-  distribución por clase y por grupo, cacheados en disco/BD.
+  entera en memoria. La miniatura sirve para el filtrado por tejido y para fijar
+  la resolución del overlay.
+- La región se cubre con una rejilla de celdas del tamaño físico del campo de
+  entrenamiento. Cada celda con suficiente tejido (según la máscara clásica) se
+  clasifica leyendo un campo REAL de la WSI en su centro.
+- Se genera un overlay RGBA (mapa de clases) y un resumen de distribución por
+  clase, cacheados en disco/BD.
 
-Nota sobre magnificación: el modelo se entrenó con parches de 224x224 a
-~0.5 µm/px (20x). Para respetar esa escala, cada celda de la rejilla se
-clasifica leyendo un parche REAL de 224x224 a 0.5 MPP desde la WSI (nivel de
-pirámide adecuado), en lugar de aplastar una miniatura. Así los resultados son
-consistentes entre la imagen completa y una región anotada, y coinciden con la
-distribución de entrenamiento del modelo. Si la imagen es muy grande, se acota
-el número de parches muestreando celdas representativas (manteniendo siempre la
-magnificación correcta).
+Escala: el modelo se entrenó con las fotos de BACH (2048x1536 px a ~0.42 µm/px,
+es decir, ~860x645 µm por imagen) reducidas a 299x299. Para respetar esa
+distribución, cada celda lee un campo de ese tamaño físico (configurable con
+``AI_FIELD_*``) que el clasificador reduce a 299x299. Solo se analizan celdas
+con tejido; si superan ``AI_MAX_PATCHES`` se muestrean uniformemente entre
+ellas y el resto se rellena (atenuado, solo en el overlay) con la clase del
+campo evaluado más cercano. La cobertura se informa en el resultado.
 
-El modelo se carga de forma perezosa y se cachea en memoria (proceso).
+Uso académico / de investigación: los porcentajes son de campos evaluados, no de
+superficie, y la confianza softmax no está calibrada. No es un diagnóstico.
 """
 from __future__ import annotations
 
 import os
 import math
 import logging
-import threading
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 from PIL import Image as PILImage
@@ -44,83 +43,83 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.analysis import AnalysisResult
 from app.models.annotation import Annotation
-from app.services.analysis.tissue_detection import detect_tissue
+from app.services.analysis.tissue_detection import DETECTOR_VERSION, detect_tissue
 from app.services.analysis.annotation_analysis_service import (
     annotation_bbox,
     _shape_mask,
+)
+from app.services.analysis.inception_classifier import (  # noqa: F401
+    MODEL_ID,
+    MODEL_INPUT_SIZE,
+    PREPROCESSING_VERSION,
+    ModelUnavailableError,  # reexportado para los routers
+    get_classifier,
 )
 from app.services.wsi.openslide_service import OpenSlideService
 
 logger = logging.getLogger(__name__)
 
 AI_ANALYSIS_TYPE = "ai_classification"
-MODEL_ID = "hf-hub:1aurent/resnet18.tiatoolbox-kather100k"
-MODEL_INPUT_SIZE = 224
-DEFAULT_MAX_PATCHES = 196
-DEFAULT_MIN_TISSUE_FRAC = 0.35
 _THUMBNAIL_MAX_SIZE = 2048
-_BATCH_SIZE = 32
 
-# Magnificación objetivo del modelo (µm/px). kather100k se entrenó a ~0.5 MPP.
-TARGET_MPP = 0.5
 # MPP por defecto si la WSI no expone metadatos de magnificación.
 DEFAULT_MPP = 0.5
 
-# Orden EXACTO de las clases del modelo (config.json del repo HF).
-CLASS_CODES: List[str] = ["BACK", "NORM", "DEB", "TUM", "ADI", "MUC", "MUS", "STR", "LYM"]
+# Códigos de clase en el orden EXACTO de las salidas del modelo
+# (benign, insitu, invasive, normal).
+CLASS_CODES: List[str] = ["BENIGN", "INSITU", "INVASIVE", "NORMAL"]
 
-# Metadatos por clase: nombre en español, grupo de alto nivel y color RGB.
+# Metadatos por clase: nombre en español, grupo (uno por clase) y color RGB.
 CLASS_META: Dict[str, Dict[str, Any]] = {
-    "BACK": {"name": "Fondo", "group": "Fondo", "color": [148, 163, 184]},
-    "NORM": {"name": "Mucosa normal", "group": "No tumoral", "color": [34, 197, 94]},
-    "DEB": {"name": "Debris / Necrosis", "group": "Necrosis", "color": [120, 53, 15]},
-    "TUM": {"name": "Tumoral", "group": "Tumoral", "color": [220, 38, 38]},
-    "ADI": {"name": "Tejido adiposo", "group": "No tumoral", "color": [96, 165, 250]},
-    "MUC": {"name": "Moco", "group": "No tumoral", "color": [45, 212, 191]},
-    "MUS": {"name": "Músculo liso", "group": "No tumoral", "color": [236, 72, 153]},
-    "STR": {"name": "Estroma", "group": "Estroma", "color": [245, 158, 11]},
-    "LYM": {"name": "Linfocitos", "group": "No tumoral", "color": [139, 92, 246]},
+    "BENIGN": {"name": "Benigno", "group": "Benigno", "color": [59, 130, 246]},
+    "INSITU": {
+        "name": "Carcinoma in situ",
+        "group": "Carcinoma in situ",
+        "color": [245, 158, 11],
+    },
+    "INVASIVE": {
+        "name": "Carcinoma invasivo",
+        "group": "Carcinoma invasivo",
+        "color": [220, 38, 38],
+    },
+    "NORMAL": {"name": "Normal", "group": "Normal", "color": [34, 197, 94]},
 }
 
-# Orden de presentación de los grupos de alto nivel.
-GROUP_ORDER: List[str] = ["Tumoral", "Estroma", "No tumoral", "Necrosis", "Fondo"]
+# Etiqueta de visualización para celdas no analizadas (no es salida del modelo).
+BACKGROUND = {"code": "BACK", "name": "Fondo / no analizado", "color": [148, 163, 184]}
 
-# Color RGB por grupo de alto nivel. El overlay, la leyenda y las barras usan
-# SIEMPRE estos colores para que lo que se pinta sobre la imagen coincida con la
-# leyenda (las 5 categorías), en lugar del color de cada clase fina.
+# Orden de presentación (de menor a mayor gravedad histológica).
+GROUP_ORDER: List[str] = ["Normal", "Benigno", "Carcinoma in situ", "Carcinoma invasivo"]
+
+# Color por grupo: el overlay, la leyenda y las barras usan siempre estos colores.
 GROUP_COLORS: Dict[str, List[int]] = {
-    "Tumoral": [220, 38, 38],
-    "Estroma": [245, 158, 11],
-    "No tumoral": [34, 197, 94],
-    "Necrosis": [120, 53, 15],
-    "Fondo": [148, 163, 184],
+    meta["group"]: meta["color"] for meta in CLASS_META.values()
 }
 
-_model = None
-_model_lock = threading.Lock()
+DISCLAIMER = (
+    "Uso académico / de investigación. Clasificación por campos muestreados; "
+    "la confianza no está calibrada y no constituye un diagnóstico clínico."
+)
 
 
 # --- Modelo ------------------------------------------------------------------
 
-def get_model():
-    """Carga (perezosamente) y cachea el modelo timm en CPU, en modo eval."""
-    global _model
-    if _model is None:
-        with _model_lock:
-            if _model is None:
-                import torch  # import diferido: solo si se usa la IA
-                import timm
-
-                logger.info("Cargando modelo de clasificación IA: %s", MODEL_ID)
-                model = timm.create_model(MODEL_ID, pretrained=True)
-                model.eval()
-                torch.set_grad_enabled(False)
-                _model = model
-    return _model
+def _predict(patches: Sequence[np.ndarray]) -> Tuple[List[int], List[float], np.ndarray]:
+    """Clasifica una lista de parches RGB. Devuelve (índices, confianzas, probs)."""
+    probs = get_classifier().predict_batch(patches, batch_size=settings.AI_BATCH_SIZE)
+    probs = np.asarray(probs, dtype=np.float32)
+    if probs.ndim != 2 or probs.shape[1] != len(CLASS_CODES):
+        raise ValueError(
+            f"Salida del modelo inesperada {probs.shape}; se esperaban "
+            f"{len(CLASS_CODES)} clases"
+        )
+    idx = probs.argmax(axis=1)
+    conf = probs[np.arange(len(idx)), idx]
+    return idx.tolist(), conf.tolist(), probs
 
 
 def class_legend() -> List[Dict[str, Any]]:
-    """Leyenda (código, nombre, grupo, color) de todas las clases del modelo."""
+    """Leyenda (código, nombre, grupo, color) de las clases del modelo."""
     return [
         {
             "code": code,
@@ -142,20 +141,77 @@ def _grid_shape(width: int, height: int, max_patches: int) -> Tuple[int, int]:
     return cols, rows
 
 
+def _finish(
+    labels: np.ndarray,
+    confid: np.ndarray,
+    prob_sum: np.ndarray,
+    x_edges: np.ndarray,
+    y_edges: np.ndarray,
+    width: int,
+    height: int,
+    inferred: Optional[np.ndarray] = None,
+    clip: Optional[np.ndarray] = None,
+) -> Dict[str, Any]:
+    """Compone recuentos, confianza, probabilidades medias y overlay."""
+    rows, cols = labels.shape
+    analyzed = labels >= 0
+    n = int(analyzed.sum())
+    counts = {code: 0 for code in CLASS_CODES}
+    for cls_idx in labels[analyzed].tolist():
+        counts[CLASS_CODES[cls_idx]] += 1
+    mean_probs = (prob_sum / n) if n else np.zeros(len(CLASS_CODES))
+
+    return {
+        "labels": labels.tolist(),
+        "rows": rows,
+        "cols": cols,
+        "counts": counts,
+        "tissue_patches": n,
+        "total_patches": rows * cols,
+        "mean_confidence": float(confid[analyzed].mean()) if n else 0.0,
+        "mean_probabilities": {
+            code: round(float(v), 4) for code, v in zip(CLASS_CODES, mean_probs)
+        },
+        "overlay": _labels_to_overlay(
+            labels, x_edges, y_edges, width, height, inferred=inferred, clip=clip
+        ),
+    }
+
+
+def _classify_into(
+    patches: Sequence[np.ndarray],
+    positions: Sequence[Tuple[int, int]],
+    labels: np.ndarray,
+    confid: np.ndarray,
+    prob_sum: np.ndarray,
+) -> None:
+    """Clasifica ``patches`` y escribe el resultado en las celdas ``positions``."""
+    if not patches:
+        return
+    preds, probs_max, probs = _predict(patches)
+    for (r, c), cls_idx, conf in zip(positions, preds, probs_max):
+        labels[r, c] = cls_idx
+        confid[r, c] = conf
+    prob_sum += probs.sum(axis=0)
+
+
 def classify_rgb(
     rgb: np.ndarray,
     tissue_mask: Optional[np.ndarray] = None,
     *,
-    max_patches: int = DEFAULT_MAX_PATCHES,
-    min_tissue_frac: float = DEFAULT_MIN_TISSUE_FRAC,
+    max_patches: Optional[int] = None,
+    min_tissue_frac: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
-    Clasifica el tejido de una imagen RGB por celdas.
+    Clasifica el tejido de una imagen RGB ya cargada en memoria, por celdas.
 
-    Devuelve un diccionario con la matriz de etiquetas (índice de clase por
-    celda; -1 = fondo/ignorada), confianzas, recuentos por clase y overlay RGBA.
+    Cada celda se entrega tal cual al clasificador (que la reduce a 299x299),
+    sin control de escala física: útil para imágenes sueltas (p. ej. fotos tipo
+    BACH) y pruebas. Para WSI se usa ``classify_slide_region``.
     """
-    import torch
+    max_patches = max_patches or settings.AI_MAX_PATCHES
+    if min_tissue_frac is None:
+        min_tissue_frac = settings.AI_MIN_TISSUE_FRAC
 
     if rgb.ndim == 2:
         rgb = np.stack([rgb] * 3, axis=-1)
@@ -165,68 +221,55 @@ def classify_rgb(
 
     height, width = rgb.shape[0], rgb.shape[1]
     cols, rows = _grid_shape(width, height, max_patches)
-
-    labels = np.full((rows, cols), -1, dtype=np.int64)
-    confid = np.zeros((rows, cols), dtype=np.float32)
-
-    # Bordes enteros de las celdas.
     x_edges = np.linspace(0, width, cols + 1).round().astype(int)
     y_edges = np.linspace(0, height, rows + 1).round().astype(int)
 
     patches: List[np.ndarray] = []
     positions: List[Tuple[int, int]] = []
-
     for r in range(rows):
         y0, y1 = y_edges[r], max(y_edges[r] + 1, y_edges[r + 1])
         for c in range(cols):
             x0, x1 = x_edges[c], max(x_edges[c] + 1, x_edges[c + 1])
-            cell = rgb[y0:y1, x0:x1]
             if tissue_mask is not None:
                 frac = float(tissue_mask[y0:y1, x0:x1].mean())
                 if frac < min_tissue_frac:
                     continue  # celda de fondo: se deja como -1
-            pil = PILImage.fromarray(cell, mode="RGB").resize(
-                (MODEL_INPUT_SIZE, MODEL_INPUT_SIZE), PILImage.BICUBIC
-            )
-            patches.append(np.asarray(pil, dtype=np.float32) / 255.0)
+            patches.append(rgb[y0:y1, x0:x1])
             positions.append((r, c))
 
-    counts = {code: 0 for code in CLASS_CODES}
+    labels = np.full((rows, cols), -1, dtype=np.int64)
+    confid = np.zeros((rows, cols), dtype=np.float32)
+    prob_sum = np.zeros(len(CLASS_CODES), dtype=np.float64)
+    _classify_into(patches, positions, labels, confid, prob_sum)
+    return _finish(labels, confid, prob_sum, x_edges, y_edges, width, height)
 
-    if patches:
-        model = get_model()
-        preds: List[int] = []
-        probs: List[float] = []
-        with torch.no_grad():
-            for i in range(0, len(patches), _BATCH_SIZE):
-                batch = np.stack(patches[i : i + _BATCH_SIZE])  # (n,224,224,3)
-                tensor = torch.from_numpy(batch).permute(0, 3, 1, 2).contiguous()
-                logits = model(tensor)
-                sm = torch.softmax(logits, dim=1)
-                conf, idx = sm.max(dim=1)
-                preds.extend(idx.tolist())
-                probs.extend(conf.tolist())
 
-        for (r, c), cls_idx, conf in zip(positions, preds, probs):
-            labels[r, c] = cls_idx
-            confid[r, c] = conf
-            counts[CLASS_CODES[cls_idx]] += 1
+def field_size_level0(mpp: float) -> Tuple[int, int]:
+    """Tamaño (ancho, alto) en px de nivel 0 del campo físico de entrenamiento."""
+    factor = settings.AI_FIELD_MPP / mpp
+    return (
+        max(1, int(round(settings.AI_FIELD_WIDTH_PX * factor))),
+        max(1, int(round(settings.AI_FIELD_HEIGHT_PX * factor))),
+    )
 
-    overlay = _labels_to_overlay(labels, x_edges, y_edges, width, height)
 
-    tissue_patches = int((labels >= 0).sum())
-    total_patches = rows * cols
+def _spread_sample(n: int, k: int) -> np.ndarray:
+    """``k`` índices de ``range(n)`` repartidos uniformemente (deterministas)."""
+    if k >= n:
+        return np.arange(n)
+    return np.unique(np.linspace(0, n - 1, k).round().astype(int))
 
-    return {
-        "labels": labels.tolist(),
-        "rows": rows,
-        "cols": cols,
-        "counts": counts,
-        "tissue_patches": tissue_patches,
-        "total_patches": total_patches,
-        "mean_confidence": float(confid[labels >= 0].mean()) if tissue_patches else 0.0,
-        "overlay": overlay,
-    }
+
+def _nearest_fill(labels: np.ndarray, targets: np.ndarray) -> np.ndarray:
+    """Clase de la celda analizada más cercana para cada celda de ``targets``
+    (-1 en el resto)."""
+    from scipy.ndimage import distance_transform_edt
+
+    known = labels >= 0
+    if not known.any() or not targets.any():
+        return np.full(labels.shape, -1, dtype=np.int64)
+    _, (ri, ci) = distance_transform_edt(~known, return_indices=True)
+    return np.where(targets, labels[ri, ci], -1)
 
 
 def classify_slide_region(
@@ -235,115 +278,126 @@ def classify_slide_region(
     thumb_rgb: np.ndarray,
     tissue_mask: Optional[np.ndarray],
     *,
-    max_patches: int = DEFAULT_MAX_PATCHES,
-    min_tissue_frac: float = DEFAULT_MIN_TISSUE_FRAC,
+    max_patches: Optional[int] = None,
+    min_tissue_frac: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
-    Clasifica una región de la WSI leyendo parches REALES a la magnificación
-    del modelo (224x224 @ ~0.5 MPP), en lugar de aplastar una miniatura.
+    Clasifica una región de la WSI leyendo campos REALES a la escala física de
+    entrenamiento (~860x645 µm por defecto), en lugar de aplastar una miniatura.
+
+    La región se cubre con una rejilla densa (una celda = un campo). Solo se
+    clasifican las celdas con tejido; si hay más que ``max_patches`` se elige un
+    subconjunto repartido uniformemente entre ELLAS (el presupuesto nunca se
+    gasta en fondo) y las celdas de tejido no evaluadas se rellenan, solo en el
+    overlay y atenuadas, con la clase del campo evaluado más cercano. Los
+    campos se leen en paralelo y se clasifican por bloques (memoria acotada).
 
     Args:
         slide: servicio OpenSlide abierto sobre la WSI.
         region_bbox: (x0, y0, w, h) de la región a clasificar, en px de nivel 0
             (imagen completa: (0, 0, W, H); anotación: su bounding box).
-        thumb_rgb: miniatura de la región (para el gating de tejido y para fijar
-            la resolución del overlay, alineado con la imagen base).
+        thumb_rgb: miniatura de la región (para el filtrado por tejido y para
+            fijar la resolución del overlay, alineado con la imagen base).
         tissue_mask: máscara booleana de tejido en la resolución de ``thumb_rgb``.
-        max_patches: cota superior de parches clasificados (acota el cómputo en
-            imágenes grandes muestreando celdas representativas).
+        max_patches: cota superior de campos clasificados.
         min_tissue_frac: fracción mínima de tejido de una celda para clasificarla.
 
-    Devuelve el mismo formato que ``classify_rgb`` (labels, overlay a resolución
-    de ``thumb_rgb``, recuentos, etc.), más metadatos de magnificación.
+    Devuelve el mismo formato que ``classify_rgb`` más metadatos de escala y
+    cobertura.
     """
-    import torch
+    from concurrent.futures import ThreadPoolExecutor
+
+    max_patches = max_patches or settings.AI_MAX_PATCHES
+    if min_tissue_frac is None:
+        min_tissue_frac = settings.AI_MIN_TISSUE_FRAC
 
     x0, y0, region_w, region_h = region_bbox
+    region_w, region_h = max(1, int(region_w)), max(1, int(region_h))
     thumb_h, thumb_w = thumb_rgb.shape[0], thumb_rgb.shape[1]
 
-    # Tamaño del parche en px de nivel 0 para alcanzar la magnificación objetivo.
-    mpp = slide.get_mpp_x() or DEFAULT_MPP
-    target_ds = TARGET_MPP / mpp
-    patch_px = max(1, int(round(MODEL_INPUT_SIZE * target_ds)))
+    slide_mpp = slide.get_mpp_x()
+    mpp = slide_mpp or DEFAULT_MPP
+    field_w, field_h = field_size_level0(mpp)
+    out_h = MODEL_INPUT_SIZE
+    out_w = max(1, int(round(MODEL_INPUT_SIZE * field_w / field_h)))
 
-    # Rejilla de celdas: si el muestreo denso (una celda por parche) supera
-    # ``max_patches``, se usa una zancada para acotar el cómputo. Cada celda se
-    # representa por un parche REAL de 224px @ 0.5 MPP leído de su centro.
-    dense_cols = max(1, int(math.ceil(region_w / patch_px)))
-    dense_rows = max(1, int(math.ceil(region_h / patch_px)))
-    stride = max(
-        1, int(math.ceil(math.sqrt((dense_cols * dense_rows) / max(1, max_patches))))
-    )
-    cols = max(1, int(round(dense_cols / stride)))
-    rows = max(1, int(round(dense_rows / stride)))
+    # Rejilla densa: celdas del tamaño exacto del campo (la última, parcial).
+    cols = max(1, int(math.ceil(region_w / field_w)))
+    rows = max(1, int(math.ceil(region_h / field_h)))
+    x_edges0 = np.minimum(np.arange(cols + 1) * field_w, region_w)
+    y_edges0 = np.minimum(np.arange(rows + 1) * field_h, region_h)
+    tx_edges = (x_edges0 * thumb_w / region_w).round().astype(int)
+    ty_edges = (y_edges0 * thumb_h / region_h).round().astype(int)
 
-    labels = np.full((rows, cols), -1, dtype=np.int64)
-    confid = np.zeros((rows, cols), dtype=np.float32)
-
-    # Bordes de celda en coords de nivel 0 (dentro de la región) y en la miniatura.
-    x_edges0 = np.linspace(0, region_w, cols + 1).round().astype(int)
-    y_edges0 = np.linspace(0, region_h, rows + 1).round().astype(int)
-    tx_edges = np.linspace(0, thumb_w, cols + 1).round().astype(int)
-    ty_edges = np.linspace(0, thumb_h, rows + 1).round().astype(int)
-
-    patches: List[np.ndarray] = []
-    positions: List[Tuple[int, int]] = []
-
+    # Celdas con tejido suficiente (se analizan) y celdas de borde con algo de
+    # tejido (no se analizan: se colorean con la clase del campo más cercano).
+    tissue_grid = np.zeros((rows, cols), dtype=bool)
+    edge_grid = np.zeros((rows, cols), dtype=bool)
+    centers: Dict[Tuple[int, int], Tuple[float, float]] = {}
+    sx, sy = region_w / thumb_w, region_h / thumb_h
     for r in range(rows):
         ty0, ty1 = ty_edges[r], max(ty_edges[r] + 1, ty_edges[r + 1])
         for c in range(cols):
             tx0, tx1 = tx_edges[c], max(tx_edges[c] + 1, tx_edges[c + 1])
-            if tissue_mask is not None:
-                frac = float(tissue_mask[ty0:ty1, tx0:tx1].mean())
-                if frac < min_tissue_frac:
-                    continue  # celda de fondo: se deja como -1
+            if tissue_mask is None:
+                tissue_grid[r, c] = True
+                continue
+            cell = tissue_mask[ty0:ty1, tx0:tx1]
+            frac = float(cell.mean()) if cell.size else 0.0
+            if frac >= min_tissue_frac:
+                tissue_grid[r, c] = True
+                # El campo se centra en el tejido de la celda (no en su centro
+                # geométrico), para que en los bordes vea tejido y no cristal.
+                yy, xx = np.nonzero(cell)
+                centers[(r, c)] = (
+                    x0 + (tx0 + xx.mean() + 0.5) * sx,
+                    y0 + (ty0 + yy.mean() + 0.5) * sy,
+                )
+            elif frac > 0:
+                edge_grid[r, c] = True
 
-            # Centro de la celda en coordenadas absolutas de nivel 0.
+    tissue_cells = [tuple(rc) for rc in np.argwhere(tissue_grid).tolist()]
+    selected = [tissue_cells[i] for i in _spread_sample(len(tissue_cells), max_patches)]
+
+    def _read(cell: Tuple[int, int]) -> np.ndarray:
+        r, c = cell
+        if cell in centers:
+            cx, cy = centers[cell]
+        else:
             cx = x0 + (int(x_edges0[c]) + int(x_edges0[c + 1])) / 2.0
             cy = y0 + (int(y_edges0[r]) + int(y_edges0[r + 1])) / 2.0
+        return slide.read_field_rgb(cx, cy, field_w, field_h, out_w, out_h)
 
-            patch = slide.read_patch_rgb(cx, cy, patch_px, out_size=MODEL_INPUT_SIZE)
-            patches.append(np.asarray(patch, dtype=np.float32) / 255.0)
-            positions.append((r, c))
+    labels = np.full((rows, cols), -1, dtype=np.int64)
+    confid = np.zeros((rows, cols), dtype=np.float32)
+    prob_sum = np.zeros(len(CLASS_CODES), dtype=np.float64)
+    chunk = max(1, settings.AI_BATCH_SIZE * 4)
+    with ThreadPoolExecutor(max_workers=max(1, settings.AI_READ_WORKERS)) as pool:
+        for i in range(0, len(selected), chunk):
+            cells = selected[i : i + chunk]
+            patches = list(pool.map(_read, cells))
+            _classify_into(patches, cells, labels, confid, prob_sum)
 
-    counts = {code: 0 for code in CLASS_CODES}
-
-    if patches:
-        model = get_model()
-        preds: List[int] = []
-        probs: List[float] = []
-        with torch.no_grad():
-            for i in range(0, len(patches), _BATCH_SIZE):
-                batch = np.stack(patches[i : i + _BATCH_SIZE])
-                tensor = torch.from_numpy(batch).permute(0, 3, 1, 2).contiguous()
-                logits = model(tensor)
-                sm = torch.softmax(logits, dim=1)
-                conf, idx = sm.max(dim=1)
-                preds.extend(idx.tolist())
-                probs.extend(conf.tolist())
-
-        for (r, c), cls_idx, conf in zip(positions, preds, probs):
-            labels[r, c] = cls_idx
-            confid[r, c] = conf
-            counts[CLASS_CODES[cls_idx]] += 1
-
-    overlay = _labels_to_overlay(labels, tx_edges, ty_edges, thumb_w, thumb_h)
-
-    tissue_patches = int((labels >= 0).sum())
-    total_patches = rows * cols
-
-    return {
-        "labels": labels.tolist(),
-        "rows": rows,
-        "cols": cols,
-        "counts": counts,
-        "tissue_patches": tissue_patches,
-        "total_patches": total_patches,
-        "mean_confidence": float(confid[labels >= 0].mean()) if tissue_patches else 0.0,
-        "overlay": overlay,
-        "mpp": round(float(mpp), 4),
-        "patch_px_level0": patch_px,
-    }
+    inferred = _nearest_fill(labels, (tissue_grid & (labels < 0)) | edge_grid)
+    result = _finish(
+        labels, confid, prob_sum, tx_edges, ty_edges, thumb_w, thumb_h,
+        inferred=inferred, clip=tissue_mask,
+    )
+    n_tissue = len(tissue_cells)
+    result.update(
+        {
+            "mpp": round(float(mpp), 4),
+            "mpp_source": "metadata" if slide_mpp else "default",
+            "patch_px_level0": [field_w, field_h],
+            "field_um": [round(field_w * mpp, 1), round(field_h * mpp, 1)],
+            "tissue_cells": n_tissue,
+            "inferred_cells": int((inferred >= 0).sum()),
+            "coverage": round(len(selected) / n_tissue, 4) if n_tissue else 1.0,
+            "sampled": len(selected) < n_tissue,
+            "field_exceeds_region": field_w > region_w or field_h > region_h,
+        }
+    )
+    return result
 
 
 def _labels_to_overlay(
@@ -353,41 +407,47 @@ def _labels_to_overlay(
     width: int,
     height: int,
     alpha: int = 140,
+    inferred: Optional[np.ndarray] = None,
+    inferred_alpha: int = 80,
+    clip: Optional[np.ndarray] = None,
 ) -> np.ndarray:
-    """Colorea cada celda según el GRUPO de su clase en una imagen RGBA
-    (H, W, 4), para que el overlay coincida con la leyenda de 5 categorías."""
+    """Colorea cada celda clasificada según su clase en una imagen RGBA (H, W, 4).
+
+    Las celdas no analizadas (fondo) quedan transparentes. Las de ``inferred``
+    (clase rellenada por vecindad; -1 si no aplica) se pintan atenuadas
+    (``inferred_alpha``) para distinguirlas de las evaluadas por el modelo.
+    Con ``clip`` (máscara de tejido del mismo tamaño) el color se limita al
+    tejido: sigue su contorno y no se pinta sobre el cristal.
+    """
     overlay = np.zeros((height, width, 4), dtype=np.uint8)
     rows, cols = labels.shape
     for r in range(rows):
         y0, y1 = y_edges[r], y_edges[r + 1]
         for c in range(cols):
-            cls_idx = labels[r, c]
+            cls_idx, a = labels[r, c], alpha
+            if cls_idx < 0 and inferred is not None and inferred[r, c] >= 0:
+                cls_idx, a = inferred[r, c], inferred_alpha
             if cls_idx < 0:
                 continue
-            code = CLASS_CODES[cls_idx]
-            group = CLASS_META[code]["group"]
-            if group == "Fondo":
-                continue  # el fondo no se pinta
             x0, x1 = x_edges[c], x_edges[c + 1]
-            color = GROUP_COLORS[group]
+            color = GROUP_COLORS[CLASS_META[CLASS_CODES[cls_idx]]["group"]]
             overlay[y0:y1, x0:x1, 0] = color[0]
             overlay[y0:y1, x0:x1, 1] = color[1]
             overlay[y0:y1, x0:x1, 2] = color[2]
-            overlay[y0:y1, x0:x1, 3] = alpha
+            overlay[y0:y1, x0:x1, 3] = a
+    if clip is not None and clip.shape == (height, width):
+        overlay[~clip] = 0
     return overlay
 
 
 # --- Resumen (distribución por clase y grupo) --------------------------------
 
 def _build_summary(counts: Dict[str, int]) -> Dict[str, Any]:
-    """Compone la distribución por clase y por grupo (excluyendo el fondo)."""
-    tissue_total = sum(v for code, v in counts.items() if code != "BACK")
-    tissue_total = tissue_total or 0
+    """Compone la distribución por clase y por grupo de los campos analizados."""
+    tissue_total = sum(counts.get(code, 0) for code in CLASS_CODES)
 
     classes: List[Dict[str, Any]] = []
     for code in CLASS_CODES:
-        if code == "BACK":
-            continue
         count = counts.get(code, 0)
         percent = round(100.0 * count / tissue_total, 2) if tissue_total else 0.0
         meta = CLASS_META[code]
@@ -405,24 +465,14 @@ def _build_summary(counts: Dict[str, int]) -> Dict[str, Any]:
 
     group_counts: Dict[str, int] = {g: 0 for g in GROUP_ORDER}
     for code in CLASS_CODES:
-        if code == "BACK":
-            continue
-        meta = CLASS_META[code]
-        group_counts[meta["group"]] += counts.get(code, 0)
+        group_counts[CLASS_META[code]["group"]] += counts.get(code, 0)
 
     groups: List[Dict[str, Any]] = []
     for g in GROUP_ORDER:
-        if g == "Fondo":
-            continue
         count = group_counts.get(g, 0)
         percent = round(100.0 * count / tissue_total, 2) if tissue_total else 0.0
         groups.append(
-            {
-                "group": g,
-                "color": GROUP_COLORS[g],
-                "count": count,
-                "percent": percent,
-            }
+            {"group": g, "color": GROUP_COLORS[g], "count": count, "percent": percent}
         )
 
     dominant_class = max(classes, key=lambda c: c["count"], default=None)
@@ -438,12 +488,18 @@ def _build_summary(counts: Dict[str, int]) -> Dict[str, Any]:
 
 
 def _model_info() -> Dict[str, Any]:
-    return {
-        "id": "1aurent/resnet18.tiatoolbox-kather100k",
-        "arch": "resnet18",
-        "dataset": "NCT-CRC-HE-100K",
-        "license": "CC-BY-4.0",
-    }
+    return get_classifier().info()
+
+
+def _is_current_model(analysis: AnalysisResult) -> bool:
+    """True si el resultado cacheado se generó con el modelo, el preprocesado y el
+    detector de tejido actuales."""
+    model = (analysis.result_data or {}).get("model") or {}
+    return (
+        model.get("id") == MODEL_ID
+        and model.get("preprocessing_version") == PREPROCESSING_VERSION
+        and (analysis.result_data or {}).get("tissue_detector_version") == DETECTOR_VERSION
+    )
 
 
 # --- Rutas de caché en disco -------------------------------------------------
@@ -474,8 +530,9 @@ def _run_and_store(
     png_path: str,
     extra: Optional[Dict[str, Any]] = None,
 ) -> AnalysisResult:
-    """Clasifica la región (parches reales a 0.5 MPP), guarda el overlay PNG y
-    persiste el AnalysisResult."""
+    """Clasifica la región (campos reales a escala de entrenamiento), guarda el
+    overlay PNG y persiste el AnalysisResult."""
+    model_info = _model_info()  # carga el modelo: falla pronto si no hay pesos
     tissue = detect_tissue(thumb_rgb)
     result = classify_slide_region(slide, region_bbox, thumb_rgb, tissue.mask)
 
@@ -484,16 +541,33 @@ def _run_and_store(
     summary = _build_summary(result["counts"])
     data: Dict[str, Any] = {
         "type": AI_ANALYSIS_TYPE,
-        "model": _model_info(),
+        "model": model_info,
         "map_path": png_path,
         "rows": result["rows"],
         "cols": result["cols"],
         "grid": result["labels"],
         "total_patches": result["total_patches"],
         "tissue_percent": round(tissue.tissue_percent, 4),
+        "tissue_detector_version": DETECTOR_VERSION,
         "mean_confidence": round(result["mean_confidence"], 4),
+        "mean_probabilities": result["mean_probabilities"],
         "mpp": result.get("mpp"),
+        "sampling": {
+            "mpp_source": result.get("mpp_source"),
+            "field_px_level0": result.get("patch_px_level0"),
+            "field_um": result.get("field_um"),
+            "tissue_cells": result.get("tissue_cells"),
+            "analyzed_cells": result["tissue_patches"],
+            "inferred_cells": result.get("inferred_cells"),
+            "coverage": result.get("coverage"),
+            "sampled": result.get("sampled"),
+            "field_exceeds_region": result.get("field_exceeds_region"),
+            "max_patches": settings.AI_MAX_PATCHES,
+            "min_tissue_frac": settings.AI_MIN_TISSUE_FRAC,
+        },
         "legend": class_legend(),
+        "background": BACKGROUND,
+        "disclaimer": DISCLAIMER,
         **summary,
     }
     if extra:
@@ -534,6 +608,14 @@ def _get_cached(
     return query.order_by(AnalysisResult.created_at.desc()).first()
 
 
+def _usable_cache(analysis: Optional[AnalysisResult]) -> bool:
+    """El resultado cacheado existe, es del modelo actual y su PNG sigue en disco."""
+    if analysis is None or not _is_current_model(analysis):
+        return False
+    map_path = (analysis.result_data or {}).get("map_path")
+    return bool(map_path and os.path.exists(map_path))
+
+
 def load_map_png_bytes(analysis: AnalysisResult) -> bytes:
     map_path = (analysis.result_data or {}).get("map_path")
     if not map_path or not os.path.exists(map_path):
@@ -572,10 +654,8 @@ def get_or_create_image_classification(
 ) -> AnalysisResult:
     if not force:
         cached = get_cached_image_classification(db, image_id)
-        if cached is not None:
-            map_path = (cached.result_data or {}).get("map_path")
-            if map_path and os.path.exists(map_path):
-                return cached
+        if _usable_cache(cached):
+            return cached
     return generate_image_classification(db, image_id, file_path)
 
 
@@ -595,7 +675,7 @@ def generate_annotation_classification(
     try:
         rgb, scale, used_bbox = slide.read_region_rgb(*bbox, max_size=_THUMBNAIL_MAX_SIZE)
         # Para formas no rectangulares, excluye (a blanco) los píxeles fuera de
-        # la forma para que el gating de tejido no clasifique fuera de la región.
+        # la forma para que el filtrado por tejido no clasifique fuera de la región.
         shape_mask = _shape_mask(
             annotation.shape_type,
             annotation.coordinates or {},
@@ -629,8 +709,6 @@ def get_or_create_annotation_classification(
 ) -> AnalysisResult:
     if not force:
         cached = get_cached_annotation_classification(db, annotation.id)
-        if cached is not None:
-            map_path = (cached.result_data or {}).get("map_path")
-            if map_path and os.path.exists(map_path):
-                return cached
+        if _usable_cache(cached):
+            return cached
     return generate_annotation_classification(db, annotation, file_path)

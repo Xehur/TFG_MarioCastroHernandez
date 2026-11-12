@@ -71,8 +71,10 @@ Se definen en el archivo `.env` de esta carpeta (ver `.env.example`):
   a `docker compose down` (no a `down -v`).
 - **Migraciones**: las tablas se crean automaticamente en el primer arranque del
   backend mediante Alembic. No hace falta ningun paso manual.
-- **Modelo de IA**: la primera clasificacion por IA descarga el modelo desde
-  Hugging Face, por lo que ese contenedor necesita acceso a Internet la primera
-  vez. Luego queda cacheado en el contenedor.
+- **Modelo de IA**: el clasificador InceptionV3 lee sus pesos de
+  `InceptionV3/HE_inceptionv3.pth` (en la raiz del repo), montado en el
+  contenedor como `/models` en solo lectura. Los pesos no se versionan en Git:
+  copia el fichero a esa ruta antes de arrancar. Si falta, los endpoints de IA
+  responden 503 y el resto de la aplicacion funciona con normalidad.
 - **CORS**: el backend permite cualquier origen por defecto, por lo que el
   frontend puede llamarlo sin configuracion adicional.

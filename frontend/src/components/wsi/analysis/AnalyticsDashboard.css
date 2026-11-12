@@ -297,3 +297,25 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.analytics-disclaimer {
+  font-style: italic;
+}
+
+.analytics-stat-sub {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.analytics-chip {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 3px;
+  vertical-align: middle;
+}
+
+.analytics-card .analytics-table {
+  margin-top: 8px;
+}

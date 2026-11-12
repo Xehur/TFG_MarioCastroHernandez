@@ -32,6 +32,26 @@ logger = logging.getLogger(__name__)
 ALLOWED_EXTENSIONS = {".svs", ".tiff", ".tif", ".mrxs"}
 
 
+def user_upload_path(user_id: int, filename: str) -> str:
+    """Ruta de guardado de una WSI: ``<UPLOAD_DIR>/<user_id>/<nombre>``.
+
+    Cada usuario tiene su propia carpeta, de modo que dos usuarios pueden subir
+    un archivo con el mismo nombre sin sobrescribirse.
+    """
+    user_dir = os.path.join(settings.UPLOAD_DIR, str(user_id))
+    os.makedirs(user_dir, exist_ok=True)
+    return os.path.join(user_dir, os.path.basename(filename))
+
+
+def find_user_image(db: Session, user_id: int, filename: str):
+    """Imagen del usuario con ese nombre (los duplicados se miden por usuario)."""
+    return (
+        db.query(Image)
+        .filter(Image.user_id == user_id, Image.filename == filename)
+        .first()
+    )
+
+
 def get_db():
     """Dependencia para obtener sesión de BD"""
     db = SessionLocal()
@@ -113,18 +133,15 @@ async def upload_image(
         )
     
     # Verificar si ya existe
-    existing_image = db.query(Image).filter(Image.filename == file.filename).first()
+    existing_image = find_user_image(db, current_user.id, file.filename)
     if existing_image:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Archivo {file.filename} ya existe"
         )
     
-    # Crear directorio de uploads si no existe
-    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-    
-    # Guardar archivo con streaming (devuelve el tamaño)
-    file_path = os.path.join(settings.UPLOAD_DIR, file.filename)
+    # Guardar archivo con streaming (devuelve el tamaño), en la carpeta del usuario
+    file_path = user_upload_path(current_user.id, file.filename)
     file_size = save_upload_file(file, file_path)
     
     # Validar tamaño después de guardarlo
@@ -302,6 +319,9 @@ async def delete_image(
 
     logger.info(f"Imagen eliminada: id={image_id}")
     return {"message": "Imagen eliminada correctamente", "id": image_id}
+
+
+def process_single_file(file: UploadFile, user_id: int, db: Session) -> ImageUploadResult:
     """
     Procesa un archivo individual y retorna el resultado
     
@@ -324,7 +344,7 @@ async def delete_image(
             )
         
         # Verificar si ya existe
-        existing_image = db.query(Image).filter(Image.filename == file.filename).first()
+        existing_image = find_user_image(db, user_id, file.filename)
         if existing_image:
             return ImageUploadResult(
                 filename=file.filename,
@@ -333,11 +353,8 @@ async def delete_image(
                 error=f"Archivo {file.filename} ya existe en el sistema"
             )
         
-        # Crear directorio de uploads si no existe
-        os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-        
-        # Guardar archivo con streaming
-        file_path = os.path.join(settings.UPLOAD_DIR, file.filename)
+        # Guardar archivo con streaming, en la carpeta del usuario
+        file_path = user_upload_path(user_id, file.filename)
         file_size = save_upload_file(file, file_path)
         
         # Validar tamaño

@@ -1,0 +1,10 @@
+              precision    recall  f1-score   support
+
+      Benign       0.88      0.86      0.87       241
+      InSitu       0.91      0.94      0.92       153
+    Invasive       0.94      0.94      0.94       124
+      Normal       0.77      0.75      0.76        92
+
+    accuracy                           0.88       610
+   macro avg       0.87      0.87      0.87       610
+weighted avg       0.88      0.88      0.88       610

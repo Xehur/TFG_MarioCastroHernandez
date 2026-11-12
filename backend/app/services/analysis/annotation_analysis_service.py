@@ -31,6 +31,8 @@ from app.models.annotation import Annotation
 from app.services.wsi.openslide_service import OpenSlideService
 from app.services.analysis.tissue_detection import (
     detect_tissue,
+    DETECTOR_VERSION,
+    is_current_detector,
     mask_to_rgba_overlay,
 )
 from app.services.analysis.density_generation import (
@@ -230,7 +232,11 @@ def get_or_create_tissue_mask(
         cached = get_cached_tissue(db, annotation.id)
         if cached is not None:
             mask_path = (cached.result_data or {}).get("mask_path")
-            if mask_path and os.path.exists(mask_path):
+            if (
+                mask_path
+                and os.path.exists(mask_path)
+                and is_current_detector(cached.result_data)
+            ):
                 return cached
     return generate_tissue_mask(db, annotation, file_path)
 
@@ -315,6 +321,7 @@ def generate_density(
     data["annotation_id"] = annotation.id
     data["bbox"] = list(used_bbox)
     data["tissue_percent"] = round(tissue.tissue_percent, 4)
+    data["detector_version"] = DETECTOR_VERSION
     data["colorbar"] = _colormap_lut(colormap, samples=16)
 
     existing = _exact_cached_density(db, annotation.id, grid_size, colormap)
@@ -348,7 +355,11 @@ def get_or_create_density(
         cached = _exact_cached_density(db, annotation.id, grid_size, colormap)
         if cached is not None:
             map_path = (cached.density_data or {}).get("map_path")
-            if map_path and os.path.exists(map_path):
+            if (
+                map_path
+                and os.path.exists(map_path)
+                and is_current_detector(cached.density_data)
+            ):
                 return cached
     return generate_density(db, annotation, file_path, grid_size, colormap)
 
@@ -458,8 +469,28 @@ def build_annotation_analytics(
     sub-anotaciones propias, así que los recuentos de anotaciones van vacíos y
     lo relevante son las estadísticas de tejido y la densidad por zonas.
     """
+    from app.models.image import Image as ImageModel
+    from app.services.analysis import ai_classification_service as ai
+
     tissue_result = get_cached_tissue(db, annotation.id)
     density_map = get_cached_density(db, annotation.id)
+    image = db.query(ImageModel).filter(ImageModel.id == annotation.image_id).first()
+    mpp = analytics_service.image_mpp(image.properties if image else None)
+    _, _, region_w, region_h = annotation_bbox(
+        annotation.shape_type, annotation.coordinates or {}
+    )
+    tissue = analytics_service._tissue_stats_from_result(tissue_result, mpp)
+    region_mm2 = (
+        round(
+            analytics_service.annotation_area_px(
+                annotation.shape_type, annotation.coordinates or {}
+            )
+            * (mpp / 1000.0) ** 2,
+            3,
+        )
+        if mpp
+        else None
+    )
 
     empty_grid: List[List[int]] = [
         [0 for _ in range(spatial_bins)] for _ in range(spatial_bins)
@@ -469,12 +500,19 @@ def build_annotation_analytics(
         "image_id": annotation.image_id,
         "annotation_id": annotation.id,
         "total_annotations": 0,
+        "annotated_area_mm2": region_mm2,
         "by_type": [],
         "by_class": [],
         "distribution": [],
         "spatial": {"bins": spatial_bins, "grid": empty_grid, "max": 0},
-        "tissue": analytics_service._tissue_stats_from_result(tissue_result),
+        "tissue": tissue,
         "density_zones": analytics_service._density_zones_from_map(
             density_map, histogram_bins
+        ),
+        "density_levels": analytics_service.density_levels(density_map),
+        "image_info": analytics_service.image_info(int(region_w), int(region_h), mpp),
+        "ai": analytics_service.ai_summary(
+            ai.get_cached_annotation_classification(db, annotation.id),
+            tissue["area_mm2"] if tissue else None,
         ),
     }

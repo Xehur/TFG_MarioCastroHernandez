@@ -21,7 +21,8 @@ docker compose up --build
 ```
 
 La primera vez descargara imagenes base e instalara dependencias (incluido
-PyTorch), por lo que puede tardar varios minutos. Cuando termine:
+PyTorch en su version solo CPU, sin las librerias CUDA), por lo que puede tardar
+varios minutos. Cuando termine:
 
 - Frontend: http://localhost:5173
 - Backend (API):  http://localhost:8000

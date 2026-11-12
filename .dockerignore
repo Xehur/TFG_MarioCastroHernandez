@@ -1,0 +1,42 @@
+# Control de versiones
+.git
+.gitignore
+
+# Entornos y dependencias (se instalan dentro de la imagen)
+.venv
+**/venv
+**/__pycache__
+**/*.pyc
+frontend/node_modules
+frontend/dist
+
+# Datos pesados y generados (no deben entrar en la imagen)
+backend/uploads
+backend/logs
+logs
+**/*.svs
+**/*.tiff
+**/*.tif
+**/*.mrxs
+**/test.db
+**/*.sqlite
+**/*.sqlite3
+**/*.log
+
+# Pesos de modelos: se montan como volumen (../InceptionV3 -> /models), no se copian
+**/*.pth
+**/*.pt
+**/*.onnx
+
+# Ficheros de entorno locales (la configuración llega por variables de docker-compose)
+**/.env
+!**/.env.example
+
+# IDE / editores
+.idea
+.vscode
+
+# Artefactos de test
+**/.pytest_cache
+**/coverage
+**/.coverage

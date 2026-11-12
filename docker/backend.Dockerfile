@@ -17,9 +17,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Instala dependencias primero para aprovechar la caché de capas
+# Instala dependencias primero para aprovechar la caché de capas.
+# PyTorch se instala desde el índice CPU: en Linux, el paquete por defecto de
+# PyPI incluye CUDA y sus librerías NVIDIA (varios GB) que el contenedor no usa
+# (la inferencia es en CPU). Las versiones siguen fijadas en requirements.txt.
 COPY backend/requirements.txt ./requirements.txt
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install --upgrade pip \
+    && pip install --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt
 
 # Copia el código del backend (el contexto de build es la raíz del repo)
 COPY backend/ ./

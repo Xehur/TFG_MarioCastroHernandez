@@ -105,7 +105,11 @@ def test_get_or_create_uses_cache_for_classical_mask(monkeypatch, tmp_path):
     fake_png.write_bytes(b"x")
 
     class _Cached:
-        result_data = {"mask_path": str(fake_png), "detector_mode": "classical"}
+        result_data = {
+            "mask_path": str(fake_png),
+            "detector_mode": "classical",
+            "detector_version": tissue_detection.DETECTOR_VERSION,
+        }
 
     cached = _Cached()
     monkeypatch.setattr(tissue_service, "get_cached_result", lambda db, iid: cached)
@@ -155,7 +159,8 @@ def test_stats_serializable():
     stats = result.stats()
     assert "tissue_percent" in stats
     assert stats["width"] == 120
-    assert stats["method"] == "otsu_saturation_intensity"
+    assert stats["method"] == "od_hysteresis"
+    assert stats["detector_version"] == tissue_detection.DETECTOR_VERSION
 
 
 def test_mask_to_rgba_overlay():
@@ -220,3 +225,79 @@ def test_tissue_mask_requires_auth(anon_client):
     image_id, _ = _make_image_with_file(filename="tissue_test5.svs")
     resp = anon_client.get(f"/images/{image_id}/tissue-mask")
     assert resp.status_code in (401, 403)
+
+
+# --- Detector OD + histéresis: tejido pálido y artefactos --------------------
+
+def _slide_with_pale_tissue():
+    """Cristal (244) con tejido teñido intenso y una zona pálida contigua."""
+    img = np.full((200, 300, 3), 244, dtype=np.uint8)
+    img[60:140, 40:140] = [150, 60, 130]   # tejido bien teñido
+    img[60:140, 140:240] = [232, 214, 226]  # tejido pálido (grasa/estroma laxo)
+    return img
+
+
+def test_detecta_tejido_palido_conectado():
+    rgb = _slide_with_pale_tissue()
+    mask = tissue_detection.detect_tissue(rgb).mask
+    assert mask[100, 90]   # tejido intenso
+    assert mask[100, 190]  # tejido pálido: antes quedaba fuera
+    assert not mask[20, 20]  # cristal
+
+
+def test_mancha_palida_aislada_no_es_tejido():
+    rgb = _slide_with_pale_tissue()
+    rgb[160:190, 250:290] = [234, 234, 234]  # mancha gris sin conexión con tejido
+    mask = tissue_detection.detect_tissue(rgb).mask
+    assert not mask[175, 270]
+
+
+def test_tinta_de_rotulador_se_excluye():
+    rgb = _slide_with_pale_tissue()
+    rgb[10:40, 160:290] = [60, 160, 130]    # trazo verde
+    rgb[18:32, 175:275] = [190, 225, 215]   # interior pálido del trazo
+    result = tissue_detection.detect_tissue(rgb)
+    assert not result.mask[25, 220]
+    assert not result.mask[15, 220]
+    assert result.mask[100, 90]
+    assert result.extra["pen_ink_percent"] > 0
+
+
+def test_franja_del_borde_del_escaner_se_elimina():
+    rgb = _slide_with_pale_tissue()
+    rgb[0:6, :] = [175, 175, 170]           # sombra del escáner en el borde
+    rgb[0:60, 80:110] = [150, 60, 130]      # el tejido llega hasta la franja
+    mask = tissue_detection.detect_tissue(rgb).mask
+    assert not mask[2, 250]  # franja fuera
+    assert mask[2, 95]       # la punta del tejido que entra en la franja se mantiene
+    assert mask[100, 90]
+
+
+def test_region_toda_tejido_no_se_recorta():
+    """Una anotación completamente dentro del tejido no pierde sus bordes."""
+    rgb = np.full((100, 100, 3), [150, 60, 130], dtype=np.uint8)
+    rgb[40:60, 40:60] = [235, 225, 232]
+    mask = tissue_detection.detect_tissue(rgb).mask
+    assert mask[0, :].all() and mask[:, 0].all()
+
+
+def test_cache_de_detector_antiguo_se_regenera(monkeypatch, tmp_path):
+    fake_png = tmp_path / "m.png"
+    fake_png.write_bytes(b"x")
+
+    class _Cached:
+        result_data = {"mask_path": str(fake_png), "detector_mode": "classical"}
+
+    monkeypatch.setattr(tissue_service, "get_cached_result", lambda db, iid: _Cached())
+    monkeypatch.setattr(tissue_service, "generate_tissue_mask", lambda *a, **k: "GENERATED")
+    assert tissue_service.get_or_create_tissue_mask(None, 1, "path.svs") == "GENERATED"
+
+
+def test_tejido_que_absorbe_en_un_solo_canal():
+    """Rosa muy pálido (solo absorbe en el verde, poca saturación): lo detecta la
+    OD MÁXIMA entre canales. Con la OD mínima quedaría fuera."""
+    img = np.full((200, 300, 3), 244, dtype=np.uint8)
+    img[60:140, 40:140] = [150, 60, 130]
+    img[60:140, 140:240] = [242, 224, 240]  # saturación ≈ 0.074 < 0.08
+    mask = tissue_detection.detect_tissue(img).mask
+    assert mask[100, 200]

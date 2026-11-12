@@ -19,6 +19,7 @@ from app.models.analysis import AnalysisResult
 from app.services.wsi.openslide_service import OpenSlideService
 from app.services.analysis.tissue_detection import (
     detect_tissue,
+    is_current_detector,
     mask_to_rgba_overlay,
 )
 
@@ -133,7 +134,7 @@ def get_or_create_tissue_mask(
             mask_path = data.get("mask_path")
             # Regenera máscaras generadas por el antiguo detector de IA
             # (detector_mode != "classical" o ausente) para auto-curarlas.
-            mode_ok = data.get("detector_mode") == "classical"
+            mode_ok = data.get("detector_mode") == "classical" and is_current_detector(data)
             if mask_path and os.path.exists(mask_path) and mode_ok:
                 return cached
     return generate_tissue_mask(db, image_id, file_path)

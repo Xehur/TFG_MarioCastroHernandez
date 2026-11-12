@@ -70,3 +70,7 @@ class AnalyticsResponse(BaseModel):
     spatial: Dict[str, Any]
     tissue: Optional[Dict[str, Any]] = None
     density_zones: Optional[Dict[str, Any]] = None
+    annotated_area_mm2: Optional[float] = None
+    density_levels: Optional[Dict[str, Any]] = None
+    image_info: Optional[Dict[str, Any]] = None
+    ai: Optional[Dict[str, Any]] = None

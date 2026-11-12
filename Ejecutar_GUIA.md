@@ -23,6 +23,23 @@ python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - API: http://localhost:8000
 - Documentación interactiva (Swagger): http://localhost:8000/docs
 
+### Modelo de IA (InceptionV3)
+
+La clasificación de tejido usa el checkpoint `InceptionV3/HE_inceptionv3.pth`
+(no se versiona en Git). Por defecto se busca en esa ruta de la raíz del repo;
+para usar otra, define `INCEPTION_WEIGHTS_PATH` en `backend/.env` o en el
+entorno. Para comprobar que carga y funciona en CPU:
+
+```powershell
+cd C:\Users\pocom\Projecto_TFG\backend
+python scripts\smoke_inception.py
+# Opcional, con fotos BACH etiquetadas en subcarpetas Benign/InSitu/Invasive/Normal:
+python scripts\smoke_inception.py --images C:\ruta\BACH\Photos --limit 25
+```
+
+Si el checkpoint falta, los endpoints de IA responden 503 y el resto de la
+aplicación funciona con normalidad.
+
 ---
 
 ## 2. Frontend (puerto 5175)

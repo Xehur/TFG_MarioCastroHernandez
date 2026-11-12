@@ -51,6 +51,28 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE: int = 1024 * 1024 * 1024 * 10  # 10GB por defecto
     CHUNK_SIZE: int = 1024 * 1024 * 8  # 8MB chunks para streaming
 
+    # Clasificación IA (InceptionV3, tejido mamario BACH)
+    # Ruta al checkpoint; por defecto <raíz del repo>/InceptionV3/HE_inceptionv3.pth
+    INCEPTION_WEIGHTS_PATH: str = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "InceptionV3",
+        "HE_inceptionv3.pth",
+    )
+    INCEPTION_WEIGHTS_SHA256: str = (
+        "42515436dd2de4057eba0846aaac2561b38dc88efe960ef6a471807536394a5e"
+    )
+    AI_DEVICE: str = "cpu"  # de momento solo "cpu" (ver Fase GPU AMD)
+    # Campo de visión de cada parche, emulando las fotos de BACH
+    # (2048x1536 px a ~0.42 µm/px ≈ 860x645 µm), reducido luego a 299x299.
+    AI_FIELD_MPP: float = 0.42
+    AI_FIELD_WIDTH_PX: int = 2048
+    AI_FIELD_HEIGHT_PX: int = 1536
+    # Máx. campos CON TEJIDO clasificados por análisis (~40 ms/campo en CPU).
+    AI_MAX_PATCHES: int = 1000
+    AI_MIN_TISSUE_FRAC: float = 0.35
+    AI_BATCH_SIZE: int = 16
+    AI_READ_WORKERS: int = 4  # hilos de lectura de campos de la WSI
+
     class Config:
         env_file = ".env"
         case_sensitive = True

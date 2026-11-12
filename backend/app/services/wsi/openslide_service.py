@@ -257,18 +257,44 @@ class OpenSlideService:
         Returns:
             array numpy uint8 RGB (out_size, out_size, 3).
         """
+        return self.read_field_rgb(
+            center_x, center_y, size_level0, size_level0, out_size, out_size
+        )
+
+    def read_field_rgb(
+        self,
+        center_x: float,
+        center_y: float,
+        width_level0: int,
+        height_level0: int,
+        out_width: int,
+        out_height: int,
+    ):
+        """
+        Lee un campo rectangular centrado en (center_x, center_y).
+
+        El campo cubre ``width_level0`` x ``height_level0`` px de nivel 0 y se
+        devuelve como array RGB (out_height, out_width, 3). Se lee del nivel de
+        la pirámide más detallado que no sobre-reduzca el campo (sin leer
+        resolución de más). Si el campo excede la imagen se desplaza para
+        quedar dentro; si la imagen es más pequeña que el campo, se recorta.
+
+        Returns:
+            array numpy uint8 RGB (out_height, out_width, 3).
+        """
         import numpy as np
 
         base_w, base_h = self.slide.dimensions
-        size_level0 = max(1, int(round(size_level0)))
+        fw = max(1, min(int(round(width_level0)), base_w))
+        fh = max(1, min(int(round(height_level0)), base_h))
 
-        x = int(round(center_x - size_level0 / 2.0))
-        y = int(round(center_y - size_level0 / 2.0))
-        x = max(0, min(x, max(0, base_w - size_level0)))
-        y = max(0, min(y, max(0, base_h - size_level0)))
+        x = int(round(center_x - fw / 2.0))
+        y = int(round(center_y - fh / 2.0))
+        x = max(0, min(x, base_w - fw))
+        y = max(0, min(y, base_h - fh))
 
-        # Nivel más detallado cuyo downsample siga sin sobre-reducir el parche.
-        target_ds = max(1.0, size_level0 / float(out_size))
+        # Nivel más detallado cuyo downsample siga sin sobre-reducir el campo.
+        target_ds = max(1.0, min(fw / float(out_width), fh / float(out_height)))
         level = 0
         for i, ds in enumerate(self.slide.level_downsamples):
             if ds <= target_ds + 1e-6:
@@ -276,13 +302,14 @@ class OpenSlideService:
             else:
                 break
         ds = self.slide.level_downsamples[level]
-        read_size = max(1, int(round(size_level0 / ds)))
+        read_w = max(1, int(round(fw / ds)))
+        read_h = max(1, int(round(fh / ds)))
 
-        region = self.slide.read_region((x, y), level, (read_size, read_size))
+        region = self.slide.read_region((x, y), level, (read_w, read_h))
         if region.mode != "RGB":
             region = region.convert("RGB")
-        if read_size != out_size:
-            region = region.resize((out_size, out_size), PILImage.BICUBIC)
+        if (read_w, read_h) != (out_width, out_height):
+            region = region.resize((out_width, out_height), PILImage.BICUBIC)
         return np.asarray(region, dtype=np.uint8)
 
     def close(self) -> None:

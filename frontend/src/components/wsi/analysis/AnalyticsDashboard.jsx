@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   BarChart3,
   PieChart as PieIcon,
-  Grid3x3,
   Activity,
   Layers,
   Brain,
+  Info,
   AlertCircle,
   Loader2,
   RefreshCw,
@@ -18,8 +18,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -42,6 +40,26 @@ const CHART_COLORS = [
   '#c026d3',
   '#7c3aed',
 ];
+
+// Orden de lectura de las clases IA (de menor a mayor gravedad histológica).
+const AI_ORDER = ['NORMAL', 'BENIGN', 'INSITU', 'INVASIVE'];
+const DENSITY_COLORS = { Baja: '#e9d5ff', Media: '#c084fc', Alta: '#7e22ce' };
+
+const nf = (value, digits = 1) =>
+  Number(value).toLocaleString('es-ES', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: digits,
+  });
+
+/** Superficie legible: "12,5 mm²", "< 0,01 mm²" o "—". */
+export const formatArea = mm2 => {
+  if (mm2 == null) return '—';
+  if (mm2 > 0 && mm2 < 0.01) return '< 0,01 mm²';
+  return `${nf(mm2, mm2 < 10 ? 2 : 1)} mm²`;
+};
+
+const formatPercent = (value, digits = 1) =>
+  value == null ? '—' : `${nf(value, digits)} %`;
 
 /** Serializa el SVG de un contenedor y lo descarga como SVG o PNG. */
 const exportChart = (container, filename, format) => {
@@ -97,7 +115,7 @@ const exportChart = (container, filename, format) => {
   img.src = url;
 };
 
-/** Cabecera de sección con título y botones de exportación. */
+/** Tarjeta con título y, opcionalmente, botones de exportación. */
 const ChartCard = ({ icon: Icon, title, exportName, chartRef, children }) => (
   <div className="analytics-card">
     <div className="analytics-card-header">
@@ -129,119 +147,58 @@ const ChartCard = ({ icon: Icon, title, exportName, chartRef, children }) => (
   </div>
 );
 
-/** Heatmap simple de distribución espacial (rejilla de celdas). */
-const SpatialHeatmap = ({ spatial }) => {
-  const { grid = [], max = 0, bins = 0 } = spatial || {};
-  if (!bins) return <p className="analytics-empty">Sin datos espaciales.</p>;
-  return (
-    <div
-      className="analytics-heatmap"
-      style={{ gridTemplateColumns: `repeat(${bins}, 1fr)` }}
-    >
-      {grid.map((row, r) =>
-        row.map((count, c) => {
-          const intensity = max > 0 ? count / max : 0;
-          return (
-            <div
-              key={`${r}-${c}`}
-              className="analytics-heatmap-cell"
-              title={`Celda [${r}, ${c}]: ${count} anotación(es)`}
-              style={{
-                background:
-                  count > 0
-                    ? `rgba(142, 45, 226, ${0.15 + intensity * 0.85})`
-                    : 'rgba(178, 69, 146, 0.06)',
-              }}
-            >
-              {count > 0 ? count : ''}
-            </div>
-          );
-        })
-      )}
-    </div>
-  );
-};
+/** Indicador del resumen superior. */
+const Stat = ({ value, label, sub }) => (
+  <div className="analytics-stat">
+    <span className="analytics-stat-value">{value}</span>
+    <span className="analytics-stat-label">{label}</span>
+    {sub && <span className="analytics-stat-sub">{sub}</span>}
+  </div>
+);
 
 /**
- * Dashboard de gráficas y tablas interactivas (issue 49).
+ * Dashboard de análisis de una imagen (o de una región anotada).
  *
- * Muestra la distribución de anotaciones (barras/tarta/tabla), la distribución
- * espacial (heatmap), las estadísticas de tejido y la densidad por zonas
- * (líneas + histograma). Permite ajustar la resolución espacial y exportar
- * cada gráfica a PNG/SVG.
+ * Presenta métricas fáciles de interpretar: superficie de tejido en mm² y nº
+ * de fragmentos, resultado de la clasificación IA (clase predominante,
+ * proporción con patrón de carcinoma y reparto por clase), reparto de la
+ * densidad de tejido en niveles bajo/medio/alto, anotaciones por clase con su
+ * área e información física de la imagen. Las gráficas se exportan a PNG/SVG.
  *
  * Props:
  * - imageId: id de la imagen (analíticas de la imagen completa)
  * - annotationId: si se indica, muestra las analíticas de esa anotación
- *   (zona marcada) "como si fuese una WSI aparte". Tiene prioridad sobre
- *   imageId para la fuente de datos.
+ *   (zona marcada) "como si fuese una WSI aparte".
  * - onClose(): cierra el dashboard
  */
 const AnalyticsDashboard = ({ imageId, annotationId, onClose }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [spatialBins, setSpatialBins] = useState(10);
-
-  const [aiData, setAiData] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
 
   const isAnnotation = annotationId != null;
 
-  const typeRef = useRef(null);
-  const classRef = useRef(null);
-  const densityLineRef = useRef(null);
-  const histRef = useRef(null);
   const aiRef = useRef(null);
-
-  // Reinicia la clasificación IA al cambiar de ámbito (imagen o anotación).
-  useEffect(() => {
-    setAiData(null);
-    setAiError(null);
-  }, [imageId, annotationId]);
-
-  const runAiClassification = useCallback(async () => {
-    setAiLoading(true);
-    setAiError(null);
-    try {
-      const res = isAnnotation
-        ? await aiClassificationService.analyzeAnnotation(annotationId)
-        : await aiClassificationService.analyze(imageId);
-      setAiData(res.result_data || null);
-    } catch (err) {
-      setAiError(
-        err.response?.data?.detail ||
-          err.message ||
-          'Error en la clasificación IA'
-      );
-    } finally {
-      setAiLoading(false);
-    }
-  }, [isAnnotation, annotationId, imageId]);
+  const densityRef = useRef(null);
+  const fragmentsRef = useRef(null);
+  const classRef = useRef(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       if (isAnnotation) {
-        let result = await annotationAnalysisService.getAnalytics(
-          annotationId,
-          { spatialBins }
-        );
+        let result = await annotationAnalysisService.getAnalytics(annotationId);
         // Si la región aún no tiene análisis, lánzalo y vuelve a pedir.
         if (!result.tissue) {
           await annotationAnalysisService.runAnalysis(annotationId);
-          result = await annotationAnalysisService.getAnalytics(annotationId, {
-            spatialBins,
-          });
+          result = await annotationAnalysisService.getAnalytics(annotationId);
         }
         setData(result);
       } else {
-        const result = await analyticsService.getAnalytics(imageId, {
-          spatialBins,
-        });
-        setData(result);
+        setData(await analyticsService.getAnalytics(imageId));
       }
     } catch (err) {
       setError(
@@ -252,39 +209,58 @@ const AnalyticsDashboard = ({ imageId, annotationId, onClose }) => {
     } finally {
       setLoading(false);
     }
-  }, [imageId, annotationId, isAnnotation, spatialBins]);
+  }, [imageId, annotationId, isAnnotation]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const densityLineData = data?.density_zones
-    ? (data.density_zones.row_means || []).map((v, i) => ({
-        zona: i + 1,
-        fila: v,
-        columna: data.density_zones.col_means?.[i] ?? null,
-      }))
-    : [];
+  const runAiClassification = useCallback(async () => {
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      if (isAnnotation) {
+        await aiClassificationService.analyzeAnnotation(annotationId);
+      } else {
+        await aiClassificationService.analyze(imageId);
+      }
+      await load();
+    } catch (err) {
+      setAiError(
+        err.response?.data?.detail ||
+          err.message ||
+          'Error en la clasificación IA'
+      );
+    } finally {
+      setAiLoading(false);
+    }
+  }, [isAnnotation, annotationId, imageId, load]);
 
-  const histData = data?.density_zones?.histogram
-    ? data.density_zones.histogram.counts.map((count, i) => ({
-        rango: `${Math.round(
-          (data.density_zones.histogram.edges[i] || 0) * 100
-        )}%`,
-        count,
-      }))
-    : [];
+  const ai = data?.ai;
+  const tissue = data?.tissue;
+  const info = data?.image_info;
 
-  const aiGroupData = (aiData?.groups || [])
-    .filter(g => g.percent > 0)
-    .map(g => ({
-      group: g.group,
-      percent: g.percent,
-      fill: `rgb(${g.color.join(',')})`,
-    }));
-  const aiDominant = aiData?.classes?.find(
-    c => c.code === aiData.dominant_class
-  );
+  const aiClasses = ai
+    ? [...(ai.classes || [])].sort(
+        (a, b) => AI_ORDER.indexOf(a.code) - AI_ORDER.indexOf(b.code)
+      )
+    : [];
+  const aiChartData = aiClasses.map(c => ({
+    name: c.name,
+    percent: c.percent,
+    fill: `rgb(${(c.color || [148, 163, 184]).join(',')})`,
+  }));
+
+  const densityData = (data?.density_levels?.levels || []).map(l => ({
+    name: `${l.level} (${l.range})`,
+    level: l.level,
+    percent: l.percent,
+  }));
+
+  const fragmentData = (tissue?.fragment_areas_mm2 || []).map((area, i) => ({
+    name: `F${i + 1}`,
+    area,
+  }));
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -300,18 +276,6 @@ const AnalyticsDashboard = ({ imageId, annotationId, onClose }) => {
               : 'Dashboard de análisis'}
           </h2>
           <div className="analytics-controls">
-            <label className="analytics-filter">
-              Resolución espacial
-              <select
-                value={spatialBins}
-                onChange={e => setSpatialBins(Number(e.target.value))}
-              >
-                <option value={5}>5 x 5</option>
-                <option value={10}>10 x 10</option>
-                <option value={15}>15 x 15</option>
-                <option value={20}>20 x 20</option>
-              </select>
-            </label>
             <button
               type="button"
               className="analytics-refresh"
@@ -331,7 +295,7 @@ const AnalyticsDashboard = ({ imageId, annotationId, onClose }) => {
           </div>
         </div>
 
-        {loading && (
+        {loading && !data && (
           <p className="analytics-loading">
             <Loader2 size={18} className="analytics-spin" /> Cargando
             analíticas…
@@ -344,37 +308,66 @@ const AnalyticsDashboard = ({ imageId, annotationId, onClose }) => {
           </p>
         )}
 
-        {!loading && !error && data && (
+        {!error && data && (
           <div className="analytics-body">
             {isAnnotation && (
               <p className="analytics-caption analytics-region-note">
                 Análisis de la región marcada (anotación #{annotationId})
-                tratada como una imagen independiente. Las gráficas de
-                anotaciones no aplican aquí; céntrate en el tejido y la densidad
-                por zonas.
+                tratada como una imagen independiente.
               </p>
             )}
+
             <div className="analytics-summary">
-              <div className="analytics-stat">
-                <span className="analytics-stat-value">
-                  {data.total_annotations}
-                </span>
-                <span className="analytics-stat-label">Anotaciones</span>
-              </div>
-              <div className="analytics-stat">
-                <span className="analytics-stat-value">
-                  {data.by_class?.length || 0}
-                </span>
-                <span className="analytics-stat-label">Clasificaciones</span>
-              </div>
-              <div className="analytics-stat">
-                <span className="analytics-stat-value">
-                  {data.tissue?.tissue_percent != null
-                    ? `${data.tissue.tissue_percent.toFixed(1)}%`
-                    : '—'}
-                </span>
-                <span className="analytics-stat-label">Tejido</span>
-              </div>
+              <Stat
+                value={
+                  tissue?.area_mm2 != null
+                    ? formatArea(tissue.area_mm2)
+                    : formatPercent(tissue?.tissue_percent)
+                }
+                label="Tejido"
+                sub={
+                  tissue?.area_mm2 != null && tissue?.tissue_percent != null
+                    ? `${formatPercent(tissue.tissue_percent)} de la ${
+                        isAnnotation ? 'región' : 'imagen'
+                      }`
+                    : null
+                }
+              />
+              <Stat
+                value={tissue?.fragments ?? '—'}
+                label="Fragmentos"
+                sub="piezas de tejido separadas"
+              />
+              <Stat
+                value={ai?.dominant_name || '—'}
+                label="Predominante (IA)"
+                sub={
+                  ai?.dominant_percent != null
+                    ? `${formatPercent(ai.dominant_percent, 0)} del tejido analizado`
+                    : 'sin clasificar todavía'
+                }
+              />
+              <Stat
+                value={ai ? formatPercent(ai.carcinoma_percent, 0) : '—'}
+                label="Patrón de carcinoma"
+                sub="in situ + invasivo"
+              />
+              {isAnnotation ? (
+                <Stat
+                  value={formatArea(data.annotated_area_mm2)}
+                  label="Área de la región"
+                />
+              ) : (
+                <Stat
+                  value={data.total_annotations}
+                  label="Anotaciones"
+                  sub={
+                    data.annotated_area_mm2 != null
+                      ? `${formatArea(data.annotated_area_mm2)} anotados`
+                      : null
+                  }
+                />
+              )}
             </div>
 
             <div className="analytics-grid">
@@ -384,39 +377,83 @@ const AnalyticsDashboard = ({ imageId, annotationId, onClose }) => {
                 exportName="clasificacion-ia"
                 chartRef={aiRef}
               >
-                {aiData ? (
+                {ai ? (
                   <>
                     <p className="analytics-caption">
-                      Modelo {aiData.model?.dataset || 'IA'}. Clase predominante:{' '}
-                      <strong>{aiDominant ? aiDominant.name : '—'}</strong>
-                      {aiData.dominant_group
-                        ? ` (${aiData.dominant_group})`
+                      Proporción de cada tipo de tejido en las zonas analizadas
+                      ({ai.analyzed_fields} de {ai.tissue_fields} campos con
+                      tejido
+                      {ai.field_um
+                        ? `, de ≈ ${ai.field_um
+                            .map(v => Math.round(v))
+                            .join('×')} µm`
                         : ''}
+                      ). Confianza media del modelo:{' '}
+                      <strong>
+                        {ai.mean_confidence != null
+                          ? formatPercent(ai.mean_confidence * 100, 0)
+                          : '—'}
+                      </strong>
                       .
                     </p>
-                    {aiGroupData.length ? (
-                      <ResponsiveContainer width="100%" height={220}>
-                        <BarChart data={aiGroupData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                          <XAxis dataKey="group" fontSize={12} />
-                          <YAxis
-                            fontSize={12}
-                            unit="%"
-                            domain={[0, 100]}
-                          />
-                          <Tooltip
-                            formatter={v => [`${v.toFixed(1)}%`, 'Proporción']}
-                          />
-                          <Bar dataKey="percent" radius={[6, 6, 0, 0]}>
-                            {aiGroupData.map((entry, i) => (
-                              <Cell key={i} fill={entry.fill} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <p className="analytics-empty">
-                        El modelo no detectó tejido clasificable en la región.
+                    <ResponsiveContainer width="100%" height={170}>
+                      <BarChart
+                        data={aiChartData}
+                        layout="vertical"
+                        margin={{ top: 4, right: 16, bottom: 4, left: 8 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                        <XAxis
+                          type="number"
+                          domain={[0, 100]}
+                          unit="%"
+                          fontSize={11}
+                        />
+                        <YAxis
+                          type="category"
+                          dataKey="name"
+                          width={120}
+                          fontSize={11}
+                        />
+                        <Tooltip
+                          formatter={v => [formatPercent(v), 'Proporción']}
+                        />
+                        <Bar dataKey="percent" radius={[0, 6, 6, 0]}>
+                          {aiChartData.map((entry, i) => (
+                            <Cell key={i} fill={entry.fill} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                    <table className="analytics-table">
+                      <thead>
+                        <tr>
+                          <th>Clase</th>
+                          <th>Proporción</th>
+                          <th>Superficie aprox.</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {aiClasses.map(c => (
+                          <tr key={c.code}>
+                            <td>
+                              <span
+                                className="analytics-chip"
+                                style={{
+                                  background: `rgb(${(c.color || []).join(',')})`,
+                                }}
+                              />
+                              {c.name}
+                            </td>
+                            <td>{formatPercent(c.percent)}</td>
+                            <td>{formatArea(c.area_mm2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {ai.disclaimer && (
+                      <p className="analytics-caption analytics-disclaimer">
+                        {ai.disclaimer}
                       </p>
                     )}
                     <button
@@ -435,14 +472,14 @@ const AnalyticsDashboard = ({ imageId, annotationId, onClose }) => {
                   </>
                 ) : aiLoading ? (
                   <p className="analytics-loading">
-                    <Loader2 size={18} className="analytics-spin" /> Clasificando
-                    con IA…
+                    <Loader2 size={18} className="analytics-spin" />{' '}
+                    Clasificando con IA…
                   </p>
                 ) : (
                   <div className="analytics-ai-cta">
                     <p className="analytics-empty">
-                      Clasifica el tejido en categorías histológicas (tumoral,
-                      estroma, no tumoral, necrosis) con un modelo de IA.
+                      Clasifica el tejido mamario en Normal, Benigno, Carcinoma
+                      in situ y Carcinoma invasivo con el modelo de IA.
                     </p>
                     <button
                       type="button"
@@ -451,154 +488,45 @@ const AnalyticsDashboard = ({ imageId, annotationId, onClose }) => {
                     >
                       <Brain size={15} /> Ejecutar clasificación IA
                     </button>
-                    {aiError && (
-                      <p className="analytics-error">
-                        <AlertCircle size={14} /> {aiError}
-                      </p>
-                    )}
                   </div>
                 )}
-              </ChartCard>
-
-              {!isAnnotation && (
-                <ChartCard
-                  icon={BarChart3}
-                  title="Anotaciones por tipo"
-                  exportName="anotaciones-por-tipo"
-                  chartRef={typeRef}
-                >
-                  {data.by_type?.length ? (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={data.by_type}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                        <XAxis dataKey="type" fontSize={12} />
-                        <YAxis allowDecimals={false} fontSize={12} />
-                        <Tooltip />
-                        <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                          {data.by_type.map((_, i) => (
-                            <Cell
-                              key={i}
-                              fill={CHART_COLORS[i % CHART_COLORS.length]}
-                            />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <p className="analytics-empty">Sin anotaciones.</p>
-                  )}
-                </ChartCard>
-              )}
-
-              {!isAnnotation && (
-                <ChartCard
-                  icon={PieIcon}
-                  title="Anotaciones por clasificación"
-                  exportName="anotaciones-por-clase"
-                  chartRef={classRef}
-                >
-                  {data.by_class?.length ? (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <PieChart>
-                        <Pie
-                          data={data.by_class}
-                          dataKey="count"
-                          nameKey="class"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={70}
-                          label={entry => entry.class}
-                        >
-                          {data.by_class.map((entry, i) => (
-                            <Cell
-                            key={i}
-                            fill={
-                              entry.color || CHART_COLORS[i % CHART_COLORS.length]
-                            }
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <p className="analytics-empty">Sin clasificaciones.</p>
+                {aiError && (
+                  <p className="analytics-error">
+                    <AlertCircle size={14} /> {aiError}
+                  </p>
                 )}
-                </ChartCard>
-              )}
-
-              <ChartCard
-                icon={Grid3x3}
-                title="Distribución espacial"
-              >
-                <SpatialHeatmap spatial={data.spatial} />
               </ChartCard>
 
               <ChartCard
                 icon={Activity}
-                title="Densidad de tejido por zonas"
-                exportName="densidad-por-zonas"
-                chartRef={densityLineRef}
+                title="Densidad del tejido"
+                exportName="densidad-tejido"
+                chartRef={densityRef}
               >
-                {densityLineData.length ? (
+                {densityData.length ? (
                   <>
                     <p className="analytics-caption">
-                      Densidad media de tejido a lo largo de la imagen: cada
-                      punto es una franja. La línea horizontal recorre la imagen
-                      de arriba abajo y la vertical de izquierda a derecha, para
-                      ver dónde se concentra el tejido.
+                      Cómo de compacto es el tejido: porcentaje de zonas con
+                      tejido según su densidad. Densidad media:{' '}
+                      <strong>
+                        {formatPercent(data.density_levels.mean_percent, 0)}
+                      </strong>
+                      .
                     </p>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <LineChart
-                        data={densityLineData}
-                        margin={{ top: 5, right: 10, bottom: 22, left: 4 }}
-                      >
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={densityData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                        <XAxis
-                          dataKey="zona"
-                          fontSize={12}
-                          label={{
-                            value: 'Franja (posición en la imagen)',
-                            position: 'insideBottom',
-                            offset: -12,
-                            fontSize: 11,
-                            fill: '#8d7ba3',
-                          }}
-                        />
-                        <YAxis
-                          fontSize={12}
-                          domain={[0, 1]}
-                          tickFormatter={v => `${Math.round(v * 100)}%`}
-                          label={{
-                            value: '% densidad',
-                            angle: -90,
-                            position: 'insideLeft',
-                            fontSize: 11,
-                            fill: '#8d7ba3',
-                          }}
-                        />
+                        <XAxis dataKey="name" fontSize={11} />
+                        <YAxis fontSize={11} unit="%" domain={[0, 100]} />
                         <Tooltip
-                          formatter={v => `${(v * 100).toFixed(1)}%`}
+                          formatter={v => [formatPercent(v), 'Zonas']}
                         />
-                        <Legend />
-                        <Line
-                          type="monotone"
-                          dataKey="fila"
-                          stroke="#8e2de2"
-                          strokeWidth={2}
-                          dot={false}
-                          name="Franjas horizontales (arriba → abajo)"
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="columna"
-                          stroke="#e07bb8"
-                          strokeWidth={2}
-                          dot={false}
-                          name="Franjas verticales (izquierda → derecha)"
-                        />
-                      </LineChart>
+                        <Bar dataKey="percent" radius={[6, 6, 0, 0]}>
+                          {densityData.map((d, i) => (
+                            <Cell key={i} fill={DENSITY_COLORS[d.level]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
                     </ResponsiveContainer>
                   </>
                 ) : (
@@ -609,111 +537,154 @@ const AnalyticsDashboard = ({ imageId, annotationId, onClose }) => {
               </ChartCard>
 
               <ChartCard
-                icon={BarChart3}
-                title="Histograma de densidad"
-                exportName="histograma-densidad"
-                chartRef={histRef}
+                icon={Layers}
+                title="Fragmentos de tejido"
+                exportName="fragmentos-tejido"
+                chartRef={fragmentsRef}
               >
-                {histData.length ? (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={histData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                      <XAxis dataKey="rango" fontSize={11} />
-                      <YAxis allowDecimals={false} fontSize={12} />
-                      <Tooltip />
-                      <Bar
-                        dataKey="count"
-                        fill="#b24592"
-                        radius={[6, 6, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
+                {fragmentData.length ? (
+                  <>
+                    <p className="analytics-caption">
+                      Cada barra es una pieza de tejido separada (p. ej. un
+                      cilindro de biopsia), ordenadas de mayor a menor
+                      superficie
+                      {tissue.fragments > fragmentData.length
+                        ? ` (se muestran las ${fragmentData.length} mayores de ${tissue.fragments})`
+                        : ''}
+                      .
+                    </p>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={fragmentData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                        <XAxis dataKey="name" fontSize={11} />
+                        <YAxis fontSize={11} unit=" mm²" width={70} />
+                        <Tooltip formatter={v => [formatArea(v), 'Superficie']} />
+                        <Bar
+                          dataKey="area"
+                          fill="#b24592"
+                          radius={[6, 6, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </>
+                ) : tissue ? (
+                  <p className="analytics-empty">
+                    {tissue.fragments
+                      ? `${tissue.fragments} fragmento(s) de tejido.`
+                      : 'No se detectaron fragmentos de tejido.'}{' '}
+                    Las superficies requieren la resolución física (µm/px) de
+                    la imagen.
+                  </p>
                 ) : (
                   <p className="analytics-empty">
-                    Genera un mapa de densidades para ver el histograma.
+                    Analiza el tejido para ver sus fragmentos.
                   </p>
                 )}
               </ChartCard>
 
-              <ChartCard icon={Layers} title="Estadísticas de tejido">
-                {data.tissue ? (
-                  <table className="analytics-table">
-                    <tbody>
-                      <tr>
-                        <td>% Tejido</td>
-                        <td>
-                          {data.tissue.tissue_percent != null
-                            ? `${data.tissue.tissue_percent.toFixed(2)}%`
-                            : '—'}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>Dimensiones</td>
-                        <td>
-                          {data.tissue.width} x {data.tissue.height} px
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>Metodo</td>
-                        <td>{data.tissue.method || '—'}</td>
-                      </tr>
-                      {data.density_zones && (
-                        <>
+              {!isAnnotation && (
+                <ChartCard
+                  icon={PieIcon}
+                  title="Anotaciones por clase"
+                  exportName="anotaciones-por-clase"
+                  chartRef={classRef}
+                >
+                  {data.by_class?.length ? (
+                    <>
+                      <ResponsiveContainer width="100%" height={190}>
+                        <PieChart>
+                          <Pie
+                            data={data.by_class}
+                            dataKey="count"
+                            nameKey="class"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={65}
+                          >
+                            {data.by_class.map((entry, i) => (
+                              <Cell
+                                key={i}
+                                fill={
+                                  entry.color ||
+                                  CHART_COLORS[i % CHART_COLORS.length]
+                                }
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <table className="analytics-table">
+                        <thead>
                           <tr>
-                            <td>Densidad máx</td>
-                            <td>
-                              {(
-                                (data.density_zones.density_max || 0) * 100
-                              ).toFixed(1)}
-                              %
-                            </td>
+                            <th>Clase</th>
+                            <th>Nº</th>
+                            <th>Área</th>
                           </tr>
-                          <tr>
-                            <td>Variabilidad</td>
-                            <td>
-                              {(
-                                (data.density_zones.density_std || 0) * 100
-                              ).toFixed(1)}
-                              %
-                            </td>
-                          </tr>
-                        </>
-                      )}
-                    </tbody>
-                  </table>
-                ) : (
-                  <p className="analytics-empty">
-                    Analiza el tejido para ver estas estadísticas.
-                  </p>
-                )}
-              </ChartCard>
+                        </thead>
+                        <tbody>
+                          {data.by_class.map(row => (
+                            <tr key={row.class}>
+                              <td>{row.class}</td>
+                              <td>{row.count}</td>
+                              <td>{formatArea(row.area_mm2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </>
+                  ) : (
+                    <p className="analytics-empty">
+                      Sin anotaciones. Dibuja zonas en el visor y asígnales una
+                      clase para verlas aquí.
+                    </p>
+                  )}
+                </ChartCard>
+              )}
 
               <ChartCard
-                icon={Grid3x3}
-                title="Distribución de anotaciones"
+                icon={Info}
+                title={isAnnotation ? 'Información de la región' : 'Información de la imagen'}
               >
-                {data.distribution?.length ? (
-                  <table className="analytics-table">
-                    <thead>
-                      <tr>
-                        <th>Tipo</th>
-                        <th>Clasificación</th>
-                        <th>Nº</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.distribution.map((row, i) => (
-                        <tr key={i}>
-                          <td>{row.type}</td>
-                          <td>{row.class}</td>
-                          <td>{row.count}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <p className="analytics-empty">Sin datos.</p>
-                )}
+                <table className="analytics-table">
+                  <tbody>
+                    <tr>
+                      <td>Tamaño</td>
+                      <td>
+                        {info?.width_mm != null
+                          ? `${nf(info.width_mm, 2)} × ${nf(info.height_mm, 2)} mm`
+                          : '—'}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Píxeles</td>
+                      <td>
+                        {info
+                          ? `${info.width_px.toLocaleString('es-ES')} × ${info.height_px.toLocaleString('es-ES')}`
+                          : '—'}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Resolución</td>
+                      <td>
+                        {info?.mpp != null ? `${nf(info.mpp, 3)} µm/px` : '—'}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Aumento aprox.</td>
+                      <td>
+                        {info?.magnification != null
+                          ? `${nf(info.magnification)}x`
+                          : '—'}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Tejido detectado</td>
+                      <td>{formatPercent(tissue?.tissue_percent)}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </ChartCard>
             </div>
           </div>

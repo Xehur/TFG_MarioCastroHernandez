@@ -11,6 +11,9 @@ y tablas en el frontend (Chart.js/Recharts/Plotly):
 - Distribución espacial de los centroides (heatmap por celdas).
 - Estadísticas de tejido (si existe análisis).
 - Densidad por zonas: medias por fila/columna e histograma (si existe mapa).
+- Métricas legibles: superficie de tejido y fragmentos en mm², reparto de
+  densidad baja/media/alta, información física de la imagen y resumen de la
+  clasificación IA ya calculada (si existe; aquí no se ejecuta).
 
 No ejecuta análisis pesados: solo agrega datos existentes, por lo que es rápido
 y seguro de llamar en tiempo real.
@@ -123,17 +126,37 @@ def _annotation_breakdowns(
     }
 
 
-def _tissue_stats_from_result(result: Optional[AnalysisResult]) -> Optional[Dict[str, Any]]:
-    """Extrae las estadísticas de tejido de un AnalysisResult (o None)."""
+def _tissue_stats_from_result(
+    result: Optional[AnalysisResult], mpp: Optional[float] = None
+) -> Optional[Dict[str, Any]]:
+    """Extrae las estadísticas de tejido de un AnalysisResult (o None).
+
+    Con ``mpp`` (µm/px de nivel 0) añade la superficie de tejido y la de cada
+    fragmento en mm², a partir de la miniatura y su escala.
+    """
     if result is None:
         return None
     data = result.result_data or {}
-    return {
+    stats: Dict[str, Any] = {
         "tissue_percent": data.get("tissue_percent"),
         "width": data.get("width"),
         "height": data.get("height"),
         "method": data.get("method"),
+        "fragments": data.get("fragments"),
+        "area_mm2": None,
+        "fragment_areas_mm2": [],
     }
+    scale = data.get("scale")
+    width, height = data.get("width") or 0, data.get("height") or 0
+    if mpp and scale and width and height and data.get("tissue_percent") is not None:
+        px_mm2 = px_area_mm2(1, scale, mpp)
+        stats["area_mm2"] = round(
+            width * height * data["tissue_percent"] / 100.0 * px_mm2, 3
+        )
+        stats["fragment_areas_mm2"] = [
+            round(a * px_mm2, 3) for a in (data.get("fragment_areas_px") or [])[:10]
+        ]
+    return stats
 
 
 def _tissue_stats(db: Session, image_id: int) -> Optional[Dict[str, Any]]:
@@ -207,6 +230,143 @@ def _density_zones(
     return _density_zones_from_map(density, histogram_bins)
 
 
+# --- Métricas físicas y resúmenes legibles -----------------------------------
+
+_MAGNIFICATIONS = (2.5, 5, 10, 20, 40, 60, 80)
+CARCINOMA_CODES = ("INSITU", "INVASIVE")
+
+
+def image_mpp(properties: Optional[Dict[str, Any]]) -> Optional[float]:
+    """µm/px de nivel 0 según los metadatos de la WSI (``openslide.mpp-x``)."""
+    try:
+        value = float((properties or {}).get("openslide.mpp-x"))
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
+def magnification(mpp: Optional[float]) -> Optional[float]:
+    """Aumento aproximado del escáner (0,25 µm/px ≈ 40x; 0,5 µm/px ≈ 20x)."""
+    if not mpp:
+        return None
+    return min(_MAGNIFICATIONS, key=lambda m: abs(m - 10.0 / mpp))
+
+
+def px_area_mm2(px: float, scale: float, mpp: float) -> float:
+    """Área en mm² de ``px`` píxeles de una miniatura de escala ``scale``."""
+    side_mm = scale * mpp / 1000.0
+    return px * side_mm * side_mm
+
+
+def image_info(width: int, height: int, mpp: Optional[float]) -> Dict[str, Any]:
+    """Tamaño en píxeles y físico de la imagen (o región) analizada."""
+    return {
+        "width_px": width,
+        "height_px": height,
+        "mpp": round(mpp, 4) if mpp else None,
+        "width_mm": round(width * mpp / 1000.0, 2) if mpp else None,
+        "height_mm": round(height * mpp / 1000.0, 2) if mpp else None,
+        "magnification": magnification(mpp),
+    }
+
+
+def annotation_area_px(shape_type: str, coords: Dict[str, Any]) -> float:
+    """Área de una anotación en píxeles de nivel 0."""
+    try:
+        if shape_type == "rectangle":
+            return abs(float(coords["width"]) * float(coords["height"]))
+        if shape_type == "circle":
+            r = float(coords.get("radius") or 0.0)
+            return 3.141592653589793 * r * r
+        if shape_type == "polygon":
+            pts = coords.get("points") or []
+            if len(pts) < 3:
+                return 0.0
+            acc = 0.0
+            for (x1, y1), (x2, y2) in zip(pts, pts[1:] + pts[:1]):
+                acc += float(x1) * float(y2) - float(x2) * float(y1)
+            return abs(acc) / 2.0
+    except (KeyError, TypeError, ValueError):
+        return 0.0
+    return 0.0
+
+
+def density_levels(density: Optional[DensityMap]) -> Optional[Dict[str, Any]]:
+    """Reparto de las zonas con tejido en densidad baja (< 33 %), media y alta
+    (> 66 %), más fácil de leer que un histograma."""
+    if density is None:
+        return None
+    matrix = (density.density_data or {}).get("matrix")
+    if not matrix:
+        return None
+    values = [v for row in matrix for v in row if v and v > 0]
+    total = len(values)
+    low = sum(1 for v in values if v < 1 / 3)
+    high = sum(1 for v in values if v > 2 / 3)
+    medium = total - low - high
+
+    def pct(n: int) -> float:
+        return round(100.0 * n / total, 1) if total else 0.0
+
+    return {
+        "zones": total,
+        "levels": [
+            {"level": "Baja", "range": "< 33 %", "count": low, "percent": pct(low)},
+            {"level": "Media", "range": "33-66 %", "count": medium, "percent": pct(medium)},
+            {"level": "Alta", "range": "> 66 %", "count": high, "percent": pct(high)},
+        ],
+        "mean_percent": round(100.0 * sum(values) / total, 1) if total else 0.0,
+    }
+
+
+def ai_summary(
+    analysis: Optional[AnalysisResult], tissue_area_mm2: Optional[float] = None
+) -> Optional[Dict[str, Any]]:
+    """Resumen legible de una clasificación IA ya calculada (no la ejecuta)."""
+    from app.services.analysis import ai_classification_service as ai  # import diferido
+
+    if analysis is None or not ai._is_current_model(analysis):
+        return None
+    data = analysis.result_data or {}
+    analyzed = data.get("tissue_patches") or 0
+    out_classes = []
+    for c in data.get("classes") or []:
+        area = (
+            round(tissue_area_mm2 * c.get("percent", 0) / 100.0, 3)
+            if tissue_area_mm2 is not None
+            else None
+        )
+        out_classes.append(
+            {
+                "code": c.get("code"),
+                "name": c.get("name"),
+                "color": c.get("color"),
+                "count": c.get("count", 0),
+                "percent": c.get("percent", 0.0),
+                "area_mm2": area,
+            }
+        )
+    dominant = next(
+        (c for c in out_classes if c["code"] == data.get("dominant_class")), None
+    )
+    sampling = data.get("sampling") or {}
+    return {
+        "analyzed_fields": analyzed,
+        "tissue_fields": sampling.get("tissue_cells") or analyzed,
+        "dominant_class": dominant["code"] if dominant else None,
+        "dominant_name": dominant["name"] if dominant else None,
+        "dominant_percent": dominant["percent"] if dominant else None,
+        "carcinoma_percent": round(
+            sum(c["percent"] for c in out_classes if c["code"] in CARCINOMA_CODES), 1
+        ),
+        "mean_confidence": data.get("mean_confidence"),
+        "classes": out_classes,
+        "model": (data.get("model") or {}).get("dataset"),
+        "field_um": sampling.get("field_um"),
+        "disclaimer": data.get("disclaimer"),
+    }
+
+
 def build_analytics(
     db: Session,
     image_id: int,
@@ -214,8 +374,11 @@ def build_analytics(
     height: int,
     spatial_bins: int = DEFAULT_SPATIAL_BINS,
     histogram_bins: int = DEFAULT_HISTOGRAM_BINS,
+    mpp: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Compone el conjunto completo de analíticas de una imagen."""
+    from app.services.analysis import ai_classification_service as ai  # import diferido
+
     annotations = (
         db.query(Annotation).filter(Annotation.image_id == image_id).all()
     )
@@ -231,13 +394,52 @@ def build_analytics(
 
     breakdowns = _annotation_breakdowns(annotations, class_map)
 
+    # Área anotada por clase (mm²), si se conoce la resolución física.
+    annotated_mm2: Optional[float] = None
+    if mpp:
+        px_to_mm2 = (mpp / 1000.0) ** 2
+        area_by_class: Dict[str, float] = {}
+        for ann in annotations:
+            cls = class_map.get(ann.class_id) if ann.class_id else None
+            name = cls.name if cls else _UNCLASSIFIED
+            area = annotation_area_px(ann.shape_type, ann.coordinates or {}) * px_to_mm2
+            area_by_class[name] = area_by_class.get(name, 0.0) + area
+        for row in breakdowns["by_class"]:
+            row["area_mm2"] = round(area_by_class.get(row["class"], 0.0), 3)
+        annotated_mm2 = round(sum(area_by_class.values()), 3)
+
+    tissue_result = (
+        db.query(AnalysisResult)
+        .filter(
+            AnalysisResult.image_id == image_id,
+            AnalysisResult.annotation_id.is_(None),
+            AnalysisResult.analysis_type == TISSUE_ANALYSIS_TYPE,
+        )
+        .order_by(AnalysisResult.created_at.desc())
+        .first()
+    )
+    tissue = _tissue_stats_from_result(tissue_result, mpp)
+    density = (
+        db.query(DensityMap)
+        .filter(DensityMap.image_id == image_id, DensityMap.annotation_id.is_(None))
+        .order_by(DensityMap.created_at.desc())
+        .first()
+    )
+
     return {
         "image_id": image_id,
         "total_annotations": len(annotations),
+        "annotated_area_mm2": annotated_mm2,
         "by_type": breakdowns["by_type"],
         "by_class": breakdowns["by_class"],
         "distribution": breakdowns["distribution"],
         "spatial": _spatial_grid(annotations, width, height, spatial_bins),
-        "tissue": _tissue_stats(db, image_id),
-        "density_zones": _density_zones(db, image_id, histogram_bins),
+        "tissue": tissue,
+        "density_zones": _density_zones_from_map(density, histogram_bins),
+        "density_levels": density_levels(density),
+        "image_info": image_info(width, height, mpp),
+        "ai": ai_summary(
+            ai.get_cached_image_classification(db, image_id),
+            tissue["area_mm2"] if tissue else None,
+        ),
     }

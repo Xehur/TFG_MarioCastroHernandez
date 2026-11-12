@@ -154,6 +154,21 @@
   gap: 8px;
 }
 
+.ai-coverage {
+  margin: 0;
+  font-size: 11px;
+  color: #b9a8cc;
+  font-variant-numeric: tabular-nums;
+}
+
+.ai-disclaimer {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: #8d7ba3;
+  font-style: italic;
+}
+
 .ai-model {
   font-size: 11px;
   color: #8d7ba3;

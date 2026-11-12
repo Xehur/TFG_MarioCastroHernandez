@@ -24,13 +24,27 @@ function makeViewer() {
 
 const SAMPLE = {
   result_data: {
-    model: { id: 'x', dataset: 'NCT-CRC-HE-100K' },
-    dominant_class: 'TUM',
-    dominant_group: 'Tumoral',
-    classes: [{ code: 'TUM', name: 'Tumoral', color: [220, 38, 38], percent: 60 }],
+    model: { id: 'inceptionv3-bach-he', dataset: 'BACH (ICIAR 2018) Photos' },
+    dominant_class: 'INVASIVE',
+    dominant_group: 'Carcinoma invasivo',
+    tissue_patches: 12,
+    total_patches: 20,
+    sampling: { field_um: [860, 645], sampled: false, tissue_cells: 12 },
+    disclaimer: 'Uso académico / de investigación.',
+    classes: [
+      {
+        code: 'INVASIVE',
+        name: 'Carcinoma invasivo',
+        color: [220, 38, 38],
+        percent: 75,
+      },
+      { code: 'NORMAL', name: 'Normal', color: [34, 197, 94], percent: 25 },
+    ],
     groups: [
-      { group: 'Tumoral', color: [220, 38, 38], percent: 60 },
-      { group: 'Estroma', color: [245, 158, 11], percent: 40 },
+      { group: 'Normal', color: [34, 197, 94], percent: 25 },
+      { group: 'Benigno', color: [59, 130, 246], percent: 0 },
+      { group: 'Carcinoma in situ', color: [245, 158, 11], percent: 0 },
+      { group: 'Carcinoma invasivo', color: [220, 38, 38], percent: 75 },
     ],
   },
 };
@@ -68,9 +82,15 @@ describe('AIClassificationControl', () => {
     );
     expect(viewer.addSimpleImage).toHaveBeenCalled();
     expect(await screen.findByText('Predominante')).toBeInTheDocument();
-    expect(screen.getAllByText(/Tumoral/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Carcinoma invasivo/).length).toBeGreaterThan(0);
+    // Solo se listan las clases con presencia (Benigno e In situ a 0 %).
+    expect(screen.queryByText('Benigno')).not.toBeInTheDocument();
     expect(screen.getByText('Ocultar')).toBeInTheDocument();
-    expect(screen.getByText('NCT-CRC-HE-100K')).toBeInTheDocument();
+    expect(screen.getByText('BACH (ICIAR 2018) Photos')).toBeInTheDocument();
+    expect(
+      screen.getByText(/12 de 12 campos con tejido analizados · campo ≈ 860×645 µm/)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Uso académico/)).toBeInTheDocument();
   });
 
   it('show() imperativo fuerza el overlay', async () => {

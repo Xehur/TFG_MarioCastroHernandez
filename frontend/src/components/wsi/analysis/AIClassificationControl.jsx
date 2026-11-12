@@ -214,6 +214,25 @@ const AIClassificationControl = forwardRef(({ viewer, imageId }, ref) => {
         </div>
       )}
 
+      {stats && stats.total_patches > 0 && (
+        <p className="ai-coverage">
+          {stats.tissue_patches} de{' '}
+          {stats.sampling?.tissue_cells ?? stats.total_patches} campos con
+          tejido analizados
+          {stats.sampling?.field_um
+            ? ` · campo ≈ ${stats.sampling.field_um
+                .map(v => Math.round(v))
+                .join('×')} µm`
+            : ''}
+          {stats.sampling?.sampled ? ' · muestreado' : ''}
+          {stats.sampling?.inferred_cells > 0
+            ? ' · zonas más claras: clase del campo vecino'
+            : ''}
+        </p>
+      )}
+
+      {stats?.disclaimer && <p className="ai-disclaimer">{stats.disclaimer}</p>}
+
       {stats && (
         <div className="ai-footer">
           <span className="ai-model" title={stats.model?.id}>

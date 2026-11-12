@@ -165,3 +165,7 @@ tmp/
 
 test.db
 *.db
+# Pesos de modelos (se cargan desde ruta configurable, no se versionan)
+*.pth
+*.pt
+*.onnx

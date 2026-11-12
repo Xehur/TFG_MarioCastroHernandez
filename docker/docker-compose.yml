@@ -24,9 +24,13 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
       ENVIRONMENT: production
       DEBUG: "false"
+      # Checkpoint InceptionV3 (no se copia en la imagen; se monta en /models)
+      INCEPTION_WEIGHTS_PATH: /models/HE_inceptionv3.pth
     volumes:
       # Persiste las imagenes WSI subidas y los overlays de analisis cacheados
       - uploads_data:/app/uploads
+      # Pesos del clasificador IA (solo lectura)
+      - ../InceptionV3:/models:ro
     depends_on:
       db:
         condition: service_healthy

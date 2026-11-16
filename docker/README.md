@@ -58,7 +58,12 @@ docker compose down -v       # ademas borra los volumenes (BD e imagenes subidas
 Se definen en el archivo `.env` de esta carpeta (ver `.env.example`):
 
 - `DB_USER`, `DB_PASSWORD`, `DB_NAME`: credenciales de PostgreSQL.
-- `SECRET_KEY`: clave para firmar los tokens JWT (cambiala en produccion).
+  `DB_PASSWORD` es obligatoria y no puede ser trivial (`1234`, `postgres`...).
+- `SECRET_KEY`: clave para firmar los tokens JWT. Obligatoria, minimo 32
+  caracteres aleatorios: `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
+- `CORS_ORIGINS`: origenes del frontend en JSON (por defecto
+  `["http://localhost:5173"]`). Debe coincidir con la URL desde la que se abre
+  la aplicacion.
 - `ACCESS_TOKEN_EXPIRE_MINUTES`: validez del token (por defecto 1440 = 24 h).
 - `VITE_API_BASE_URL`: URL del backend tal como la ve el NAVEGADOR del usuario.
   Por defecto `http://localhost:8000`. Si sirves la app desde otra maquina,
@@ -77,5 +82,9 @@ Se definen en el archivo `.env` de esta carpeta (ver `.env.example`):
   contenedor como `/models` en solo lectura. Los pesos no se versionan en Git:
   copia el fichero a esa ruta antes de arrancar. Si falta, los endpoints de IA
   responden 503 y el resto de la aplicacion funciona con normalidad.
-- **CORS**: el backend permite cualquier origen por defecto, por lo que el
-  frontend puede llamarlo sin configuracion adicional.
+- **CORS**: el contenedor arranca en modo produccion, que solo admite los
+  origenes de `CORS_ORIGINS`. Si sirves el frontend desde otra IP o dominio,
+  añadelo ahi.
+- **Seguridad**: si falta `SECRET_KEY` o `DB_PASSWORD`, `docker compose` se
+  niega a arrancar; si son inseguras, el backend se detiene con un error que
+  indica que corregir. `/docs` esta desactivado (activalo con `ENABLE_DOCS=true`).

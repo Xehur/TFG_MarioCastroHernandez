@@ -230,7 +230,10 @@ sobrescribir con variables de entorno o un fichero `.env`:
 | Variable | Por defecto | Para qué |
 |---|---|---|
 | `DATABASE_URL` | `postgresql://postgres:1234@localhost:5432/wsi_db` | Conexión a PostgreSQL |
+| `ENVIRONMENT` | `development` | Con `production` se exige configuración segura (ver abajo) |
 | `SECRET_KEY`, `ALGORITHM` | valor de desarrollo, `HS256` | Firma de los JWT |
+| `CORS_ORIGINS` | `["*"]` | Orígenes permitidos (JSON). En producción no se admite `*` |
+| `ENABLE_DOCS` | activo salvo en producción | Expone `/docs`, `/redoc` y `/openapi.json` |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | 1440 (24 h) | Caducidad del token |
 | `UPLOAD_DIR` | `uploads` | Carpeta de WSI y resultados |
 | `MAX_FILE_SIZE`, `CHUNK_SIZE` | 10 GB, 8 MB | Límite de subida y tamaño de bloque |
@@ -238,6 +241,10 @@ sobrescribir con variables de entorno o un fichero `.env`:
 | `INCEPTION_WEIGHTS_SHA256` | hash del checkpoint actual | Verificación de integridad (aviso si no coincide) |
 | `AI_DEVICE` | `cpu` | Dispositivo de inferencia (de momento solo CPU) |
 | `AI_FIELD_MPP`, `AI_FIELD_WIDTH_PX`, `AI_FIELD_HEIGHT_PX` | 0.42, 2048, 1536 | Campo físico que ve el modelo (≈ 860 × 645 µm) |
+
+Con `ENVIRONMENT=production` el backend **no arranca** si `SECRET_KEY` es la de
+desarrollo o tiene menos de 32 caracteres, si `DATABASE_URL` usa una contraseña
+trivial (`1234`, `postgres`...) o si `CORS_ORIGINS` contiene `*`.
 | `AI_MAX_PATCHES` | 1000 | Máximo de campos con tejido clasificados por análisis |
 | `AI_MIN_TISSUE_FRAC` | 0.35 | Fracción mínima de tejido para analizar una celda |
 | `AI_BATCH_SIZE`, `AI_READ_WORKERS` | 16, 4 | Tamaño de lote e hilos de lectura de la WSI |

@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-1234}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD en docker/.env}
       POSTGRES_DB: ${DB_NAME:-wsi_db}
     volumes:
       - db_data:/var/lib/postgresql/data
@@ -19,8 +19,10 @@ services:
       context: ..
       dockerfile: docker/backend.Dockerfile
     environment:
-      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-1234}@db:5432/${DB_NAME:-wsi_db}
-      SECRET_KEY: ${SECRET_KEY:-CHANGE-ME-please-override}
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:?Define DB_PASSWORD en docker/.env}@db:5432/${DB_NAME:-wsi_db}
+      SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en docker/.env}
+      # Origen(es) del frontend que pueden llamar a la API (JSON)
+      CORS_ORIGINS: '${CORS_ORIGINS:-["http://localhost:5173"]}'
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
       ENVIRONMENT: production
       DEBUG: "false"
@@ -34,6 +36,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # Expuesto porque el navegador llama a la API directamente (VITE_API_BASE_URL)
     ports:
       - "8000:8000"
     healthcheck:

@@ -38,7 +38,11 @@ app = FastAPI(
     description=settings.APP_DESCRIPTION,
     version=settings.APP_VERSION,
     debug=settings.DEBUG,
-    lifespan=lifespan
+    lifespan=lifespan,
+    # En producción la documentación interactiva se oculta (ver ENABLE_DOCS).
+    docs_url="/docs" if settings.docs_enabled else None,
+    redoc_url="/redoc" if settings.docs_enabled else None,
+    openapi_url="/openapi.json" if settings.docs_enabled else None,
 )
 
 # Configurar CORS
@@ -72,7 +76,7 @@ async def root():
         "message": settings.APP_NAME,
         "version": settings.APP_VERSION,
         "description": settings.APP_DESCRIPTION,
-        "docs": "/docs"
+        "docs": "/docs" if settings.docs_enabled else None,
     }
 
 

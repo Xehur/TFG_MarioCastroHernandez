@@ -2,7 +2,12 @@
 Configuración centralizada de la aplicación
 """
 import os
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
+
+# Valores por defecto SOLO válidos en desarrollo. En producción se rechazan.
+_DEV_SECRET_KEY = "CHANGE-ME-dev-secret-key-please-override-in-env"
+_INSECURE_DB_PASSWORDS = {"", "1234", "postgres", "password"}
 
 
 class Settings(BaseSettings):
@@ -13,7 +18,7 @@ class Settings(BaseSettings):
 
     # Información de la aplicación
     APP_NAME: str = "WSI Visualization API"
-    APP_VERSION: str = "0.1.0"
+    APP_VERSION: str = "1.0.0"
     APP_DESCRIPTION: str = "API para visualización de imágenes WSI con IA"
 
     # Ambiente
@@ -25,7 +30,7 @@ class Settings(BaseSettings):
     API_PORT: int = 8000
 
     # Seguridad / Autenticación (JWT)
-    SECRET_KEY: str = "CHANGE-ME-dev-secret-key-please-override-in-env"
+    SECRET_KEY: str = _DEV_SECRET_KEY
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 horas
 
@@ -37,7 +42,12 @@ class Settings(BaseSettings):
     DB_PASSWORD: str = "1234"
     DB_NAME: str = "wsi_db"
 
-    # CORS
+    # Documentación interactiva (/docs, /redoc, /openapi.json). Si no se
+    # define, se activa en desarrollo y se desactiva en producción.
+    ENABLE_DOCS: bool | None = None
+
+    # CORS. Desde variable de entorno se indica como JSON, p. ej.
+    # CORS_ORIGINS='["https://mi-dominio.es"]'. En producción "*" no se admite.
     CORS_ORIGINS: list = ["*"]
     CORS_ALLOW_CREDENTIALS: bool = True
     CORS_ALLOW_METHODS: list = ["*"]
@@ -76,6 +86,39 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+
+    @model_validator(mode="after")
+    def _check_production(self) -> "Settings":
+        """En producción, impide arrancar con la configuración insegura de
+        desarrollo (clave JWT por defecto, contraseña de BD trivial, CORS *)."""
+        if not self.is_production:
+            return self
+        errors = []
+        if self.SECRET_KEY == _DEV_SECRET_KEY or len(self.SECRET_KEY) < 32:
+            errors.append(
+                "SECRET_KEY debe definirse con una cadena aleatoria de al menos 32 "
+                "caracteres (p. ej. `python -c \"import secrets; "
+                "print(secrets.token_urlsafe(48))\"`)"
+            )
+        if any(f":{pwd}@" in self.DATABASE_URL for pwd in _INSECURE_DB_PASSWORDS):
+            errors.append("DATABASE_URL usa una contraseña de BD trivial")
+        if "*" in self.CORS_ORIGINS:
+            errors.append(
+                "CORS_ORIGINS no puede ser '*': indica el origen del frontend"
+            )
+        if errors:
+            raise ValueError(
+                "Configuración insegura para ENVIRONMENT=production:\n- "
+                + "\n- ".join(errors)
+            )
+        return self
+
+    @property
+    def docs_enabled(self) -> bool:
+        """Swagger/ReDoc activos salvo que se desactiven (o en producción)."""
+        if self.ENABLE_DOCS is not None:
+            return self.ENABLE_DOCS
+        return not self.is_production
 
     @property
     def is_production(self) -> bool:

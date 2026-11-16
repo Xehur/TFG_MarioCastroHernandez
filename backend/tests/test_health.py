@@ -3,6 +3,8 @@ Tests para endpoints de salud
 """
 import pytest
 
+from app.config import settings
+
 
 def test_root_endpoint(client):
     """
@@ -11,7 +13,7 @@ def test_root_endpoint(client):
     response = client.get("/")
     assert response.status_code == 200
     assert "message" in response.json()
-    assert response.json()["version"] == "0.1.0"
+    assert response.json()["version"] == settings.APP_VERSION
 
 
 def test_health_endpoint(client):

@@ -47,6 +47,23 @@ funcionamiento interno se describen en el [README](README.md).
 - **Tus imágenes son privadas.** Cada usuario solo ve y gestiona las imágenes que
   ha subido.
 
+### ¿No tienes imágenes? Usa las de ejemplo
+
+Si la aplicación se instaló con Docker, puedes importar en tu cuenta WSI reales
+de tejido mamario del dataset público **BACH**, con las zonas que marcaron
+patólogos expertos:
+
+1. Crea tu cuenta ([sección 2](#2-crear-una-cuenta)).
+2. En una terminal, dentro de la carpeta `docker` del proyecto, ejecuta
+   `.\preparar_ejemplos.ps1` (Windows) o `sh preparar_ejemplos.sh` (Linux/macOS).
+3. Escribe el email y la contraseña de tu cuenta cuando te los pida.
+
+Se descargan e importan 2 imágenes (~350 MB; tarda unos minutos). Aparecerán en
+tu galería como `BACH_A03.svs` y `BACH_A07.svs`, con anotaciones de tipo
+polígono etiquetadas «Patólogo» y clasificadas como **Benigno**, **Carcinoma in
+situ** o **Carcinoma invasivo**. Son útiles para comparar con el resultado de la
+clasificación por IA.
+
 ---
 
 ## 2. Crear una cuenta

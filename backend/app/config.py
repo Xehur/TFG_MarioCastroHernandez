@@ -71,7 +71,9 @@ class Settings(BaseSettings):
     INCEPTION_WEIGHTS_SHA256: str = (
         "42515436dd2de4057eba0846aaac2561b38dc88efe960ef6a471807536394a5e"
     )
-    AI_DEVICE: str = "cpu"  # de momento solo "cpu" (ver Fase GPU AMD)
+    # Dispositivo de la IA: "cpu", "cuda"/"gpu" (NVIDIA CUDA o AMD ROCm) o "auto".
+    # Si se pide GPU y no está disponible, se usa CPU con un aviso en el log.
+    AI_DEVICE: str = "cpu"
     # Campo de visión de cada parche, emulando las fotos de BACH
     # (2048x1536 px a ~0.42 µm/px ≈ 860x645 µm), reducido luego a 299x299.
     AI_FIELD_MPP: float = 0.42

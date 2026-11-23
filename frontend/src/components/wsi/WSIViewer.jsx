@@ -79,7 +79,6 @@ const WSIViewer = ({ imageId, apiBaseUrl, className = '', onError, onViewerReady
         perfMonitorRef.current = perf;
 
         viewerInstanceRef.current.addHandler('open', () => {
-          console.log('WSI Image opened successfully');
           if (mounted) {
             setViewerState({ isLoading: false, error: null });
             setViewerReady(true);

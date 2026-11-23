@@ -9,8 +9,7 @@ import './Upload.css';
 const Upload = () => {
   const navigate = useNavigate();
 
-  const handleUploadComplete = response => {
-    console.log('Upload completed:', response);
+  const handleUploadComplete = () => {
     // Opcional: Mostrar notificación de éxito
   };
 
@@ -48,12 +47,8 @@ const Upload = () => {
           </h3>
           <ul>
             <li>.svs (Aperio)</li>
-            <li>.tif, .tiff (Generic TIFF)</li>
-            <li>.ndpi (Hamamatsu)</li>
-            <li>.vms, .vmu (Ventana)</li>
-            <li>.scn (Leica)</li>
+            <li>.tif, .tiff (TIFF piramidal)</li>
             <li>.mrxs (MIRAX)</li>
-            <li>.bif (Ventana BigTIFF)</li>
           </ul>
         </div>
 
@@ -62,7 +57,7 @@ const Upload = () => {
             <Ruler size={18} /> Límites
           </h3>
           <ul>
-            <li>Tamaño máximo: 2GB por archivo</li>
+            <li>Tamaño máximo: 10 GB por archivo</li>
             <li>Múltiples archivos permitidos</li>
             <li>Formatos validados automáticamente</li>
           </ul>

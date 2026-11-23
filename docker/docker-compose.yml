@@ -14,11 +14,19 @@ services:
       retries: 12
     restart: unless-stopped
 
+  # IA en CPU por defecto. Para usar una GPU, combina este fichero con
+  # docker-compose.gpu-nvidia.yml o docker-compose.gpu-amd.yml (ver README.md
+  # de esta carpeta o los scripts iniciar.ps1 / iniciar.sh).
   backend:
+    image: wsi-tfg-backend:cpu
     build:
       context: ..
       dockerfile: docker/backend.Dockerfile
+      args:
+        TORCH_INDEX_URL: https://download.pytorch.org/whl/cpu
     environment:
+      # Dispositivo de la IA: cpu | cuda (= gpu) | auto
+      AI_DEVICE: ${AI_DEVICE:-cpu}
       DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:?Define DB_PASSWORD en docker/.env}@db:5432/${DB_NAME:-wsi_db}
       SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en docker/.env}
       # Origen(es) del frontend que pueden llamar a la API (JSON)
@@ -26,6 +34,8 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
       ENVIRONMENT: production
       DEBUG: "false"
+      # Documentacion interactiva (/docs): desactivada salvo ENABLE_DOCS=true en .env
+      ENABLE_DOCS: ${ENABLE_DOCS:-false}
       # Checkpoint InceptionV3 (no se copia en la imagen; se monta en /models)
       INCEPTION_WEIGHTS_PATH: /models/HE_inceptionv3.pth
     volumes:

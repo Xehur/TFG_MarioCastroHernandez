@@ -17,13 +17,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
+# Variante de PyTorch según el hardware de la IA (la elige docker-compose):
+#   CPU (por defecto)  https://download.pytorch.org/whl/cpu      (imagen ligera)
+#   GPU NVIDIA         https://download.pytorch.org/whl/cu126    (CUDA 12.6)
+#   GPU AMD            https://download.pytorch.org/whl/rocm7.1  (ROCm 7.1)
+# Las versiones de torch/torchvision siguen fijadas en requirements.txt; el índice
+# extra solo decide qué compilación se instala (+cpu, +cu126 o +rocm7.1).
+ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
+
 # Instala dependencias primero para aprovechar la caché de capas.
-# PyTorch se instala desde el índice CPU: en Linux, el paquete por defecto de
-# PyPI incluye CUDA y sus librerías NVIDIA (varios GB) que el contenedor no usa
-# (la inferencia es en CPU). Las versiones siguen fijadas en requirements.txt.
 COPY backend/requirements.txt ./requirements.txt
 RUN pip install --upgrade pip \
-    && pip install --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt
+    && pip install --extra-index-url ${TORCH_INDEX_URL} -r requirements.txt \
+    && python -c "import torch; print('PyTorch', torch.__version__)"
 
 # Copia el código del backend (el contexto de build es la raíz del repo)
 COPY backend/ ./

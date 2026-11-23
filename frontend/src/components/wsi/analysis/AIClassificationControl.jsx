@@ -15,7 +15,7 @@ import './AIClassificationControl.css';
  *
  * Superpone el mapa de clases generado por el modelo de IA sobre la imagen base
  * de OpenSeadragon, con toggle de visibilidad, opacidad, leyenda de clases y
- * distribución por grupo (tumoral, estroma, no tumoral, necrosis).
+ * distribución por clase (Normal, Benigno, Carcinoma in situ, Carcinoma invasivo).
  *
  * Props:
  * - viewer: instancia de OpenSeadragon (o null si aún no está lista)
@@ -235,8 +235,21 @@ const AIClassificationControl = forwardRef(({ viewer, imageId }, ref) => {
 
       {stats && (
         <div className="ai-footer">
-          <span className="ai-model" title={stats.model?.id}>
+          <span
+            className="ai-model"
+            title={[
+              stats.model?.id,
+              stats.model?.gpu_name ? `GPU: ${stats.model.gpu_name}` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          >
             {stats.model?.dataset || 'IA'}
+            {stats.model?.device && (
+              <span className="ai-device">
+                {stats.model.device === 'cpu' ? 'CPU' : 'GPU'}
+              </span>
+            )}
           </span>
           <button
             type="button"

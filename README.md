@@ -9,6 +9,10 @@ Aplicación web para **visualizar imágenes de portaobjetos completos (WSI)**,
 > diagnóstico clínico, las confianzas del modelo no están calibradas y el modelo no
 > se ha validado sobre WSI completas de pacientes.
 
+> **¿Buscas cómo usar la aplicación?** Consulta el
+> [Manual de usuario](Manual_Usuario.md), con capturas de cada pantalla. Este
+> README describe cómo funciona por dentro y cómo instalarla.
+
 ---
 
 ## Índice
@@ -207,8 +211,9 @@ Projecto_TFG/
 │   ├── src/inference.py           # Script de inferencia original (referencia)
 │   ├── metricas.txt, matriz_confusion.png, graficas_rendimiento.png
 │   └── environment.yml            # Entorno con el que se entrenó
-├── docker/                        # Dockerfiles, docker-compose, nginx y su README
-├── Ejecutar_GUIA.md               # Guía rápida de arranque en Windows
+├── docker/                        # Dockerfiles, docker-compose, scripts iniciar y su README
+├── docs/manual/img/               # Capturas del manual de usuario
+├── Manual_Usuario.md              # Manual de usuario (qué hacer en cada pantalla)
 └── README.md
 ```
 
@@ -239,7 +244,7 @@ sobrescribir con variables de entorno o un fichero `.env`:
 | `MAX_FILE_SIZE`, `CHUNK_SIZE` | 10 GB, 8 MB | Límite de subida y tamaño de bloque |
 | `INCEPTION_WEIGHTS_PATH` | `<repo>/InceptionV3/HE_inceptionv3.pth` | Pesos del modelo |
 | `INCEPTION_WEIGHTS_SHA256` | hash del checkpoint actual | Verificación de integridad (aviso si no coincide) |
-| `AI_DEVICE` | `cpu` | Dispositivo de inferencia (de momento solo CPU) |
+| `AI_DEVICE` | `cpu` | Dispositivo de inferencia: `cpu`, `cuda`/`gpu` (NVIDIA CUDA o AMD ROCm) o `auto`. Si se pide GPU y no hay, usa CPU |
 | `AI_FIELD_MPP`, `AI_FIELD_WIDTH_PX`, `AI_FIELD_HEIGHT_PX` | 0.42, 2048, 1536 | Campo físico que ve el modelo (≈ 860 × 645 µm) |
 
 Con `ENVIRONMENT=production` el backend **no arranca** si `SECRET_KEY` es la de
@@ -448,9 +453,17 @@ Módulo aislado con la clase `InceptionClassifier` y la función `get_classifier
 - **Preprocesado** idéntico a la validación del entrenamiento:
   `RGB → Resize(299×299) → ToTensor → Normalize(media/desv. de ImageNet)`. Acepta
   imágenes PIL o arrays en gris, RGB o RGBA (`to_rgb_uint8`).
+- **Dispositivo (CPU o GPU)**: `AI_DEVICE` admite `cpu`, `cuda` (alias `gpu`,
+  `rocm`) y `auto`. PyTorch expone igual las GPU NVIDIA (CUDA) y AMD (ROCm), así
+  que el código es el mismo. Al cargar, el modelo se lleva a la GPU y se hace una
+  inferencia de prueba; si no hay GPU o falla (p. ej. arquitectura no soportada
+  por esa versión de ROCm), **vuelve a CPU con un aviso** y la aplicación sigue
+  funcionando. `gpu_info()` da el diagnóstico (versión y compilación de PyTorch,
+  GPU detectada) que publica `GET /health/ai`.
 - **Inferencia**: `predict_batch(imágenes, batch_size)` → array `(N, 4)` de
   probabilidades softmax, en `torch.inference_mode()`.
 - **`info()`**: id del modelo, arquitectura, dataset, clases, tamaño de entrada,
+  dispositivo usado y nombre de la GPU,
   versión de preprocesado, hash de los pesos y dispositivo. Se guarda con cada
   resultado.
 
@@ -666,6 +679,7 @@ Todos los endpoints salvo salud, raíz, registro y login exigen
 | Método | Ruta | Descripción |
 |---|---|---|
 | GET | `/`, `/health/`, `/health/live`, `/health/ready` | Información y sondas de salud |
+| GET | `/health/ai` | Estado de la IA: dispositivo pedido y usado, compilación de PyTorch (cpu/cuda/rocm), GPU detectada, pesos presentes (no carga el modelo) |
 | POST | `/auth/register`, `/auth/login` | Devuelven token + usuario |
 | GET / PATCH | `/auth/me` | Perfil del usuario / actualizar nombre, email o contraseña |
 | POST / GET / DELETE | `/users/`, `/users/{id}` | Gestión de usuarios |
@@ -766,7 +780,9 @@ npm test
 - Node.js.
 - PostgreSQL accesible según `DATABASE_URL`.
 - El checkpoint `InceptionV3/HE_inceptionv3.pth` (o la ruta en
-  `INCEPTION_WEIGHTS_PATH`). Sin él, todo funciona salvo la IA, que responde 503.
+  `INCEPTION_WEIGHTS_PATH`). No está en Git: se descarga del release de GitHub
+  (los scripts de Docker lo hacen solos). Sin él, todo funciona salvo la IA, que
+  responde 503.
 
 ### En local (Windows / PowerShell)
 
@@ -798,15 +814,50 @@ Frontend (otra terminal):
 cd frontend; npm.cmd run dev -- --port 5175
 ```
 
-La URL del backend que usa el frontend se define en `frontend/.env`
-(`VITE_API_BASE_URL=http://localhost:8000`). Más detalles en `Ejecutar_GUIA.md`.
+La aplicación queda en http://localhost:5175. Notas:
+
+- La URL del backend que usa el frontend se define en `frontend/.env`
+  (`VITE_API_BASE_URL=http://localhost:8000`); si la cambias, reinicia Vite.
+- En PowerShell usa `npm.cmd` / `npx.cmd` en lugar de `npm` / `npx`, que la
+  política de ejecución de scripts puede bloquear.
+- Para comprobar el modelo de IA, ver la [sección 7.5](#75-comprobar-el-modelo-scriptssmoke_inceptionpy);
+  para los tests, la [sección 14](#14-pruebas).
+- Para parar los servidores, pulsa **Ctrl + C** en cada terminal.
 
 ### Con Docker
 
 `docker/docker-compose.yml` levanta tres servicios: `db` (PostgreSQL 16), `backend`
 (aplica las migraciones al arrancar; puerto 8000) y `frontend` (build de Vite
 servida por nginx; puerto 5173). Los pesos se montan en solo lectura desde
-`../InceptionV3` en `/models`. Ver `docker/README.md`.
+`../InceptionV3` en `/models`.
+
+**En otro equipo basta con clonar el repositorio y ejecutar un script** desde
+`docker/` (con Docker instalado y en marcha):
+
+```bash
+.\iniciar.ps1
+```
+
+En Linux / macOS: `sh iniciar.sh`. El script:
+
+1. Crea `docker/.env` a partir de `.env.example` con una `SECRET_KEY` y una
+   `DB_PASSWORD` aleatorias (si ya existe, solo rellena las que falten).
+2. Descarga los pesos `HE_inceptionv3.pth` del **último release de GitHub** si no
+   están y comprueba su SHA-256. Los pesos no se versionan en Git: hay que
+   adjuntarlos a cada release. Si la descarga falla, la app arranca sin IA.
+3. Pregunta dónde ejecutar la IA y lanza `docker compose ... up --build -d`:
+
+| Opción | Fichero que se añade | Requisitos | PyTorch |
+|---|---|---|---|
+| CPU (por defecto) | — | Ninguno | `+cpu` |
+| GPU NVIDIA | `docker-compose.gpu-nvidia.yml` | Driver NVIDIA; Linux con NVIDIA Container Toolkit o Windows con Docker Desktop (WSL2) | `+cu126` |
+| GPU AMD | `docker-compose.gpu-amd.yml` | Solo Linux con ROCm (`/dev/kfd`, `/dev/dri`) | `+rocm7.1` |
+
+Cada variante construye su propia imagen del backend (`wsi-tfg-backend:cpu`,
+`:cuda`, `:rocm`) con el índice de PyTorch adecuado (`TORCH_INDEX_URL` en
+`backend.Dockerfile`) y fija `AI_DEVICE`. Si la GPU no está disponible, la IA
+funciona en CPU. Se comprueba en `http://localhost:8000/health/ai` o en la
+etiqueta CPU/GPU del panel de IA. Detalles en `docker/README.md`.
 
 ---
 
@@ -814,9 +865,11 @@ servida por nginx; puerto 5173). Los pesos se montan en solo lectura desde
 
 - **Validación clínica**: falta evaluar el modelo en WSI mamarias independientes,
   con anotaciones de patólogo y separación por paciente.
-- **GPU AMD (RX 7800 XT)**: la inferencia es solo CPU. El siguiente paso previsto es
-  probar **ONNX Runtime + DirectML** (o `torch-directml`) en un entorno separado,
-  comparar resultados con la CPU y activarlo mediante `AI_DEVICE`.
+- **GPU AMD en Windows**: la GPU se usa con PyTorch + CUDA (NVIDIA) o + ROCm (AMD,
+  solo Linux). Docker Desktop en Windows no expone GPU AMD, y PyTorch no tiene
+  ROCm nativo en Windows: en ese caso la IA va en CPU. Una vía futura sería
+  **ONNX Runtime + DirectML** fuera de Docker. Los tiempos en GPU no se han
+  medido en este proyecto.
 - **Análisis síncronos**: los análisis se resuelven dentro de la petición HTTP. Para
   WSI muy grandes convendría una cola de tareas con progreso real.
 - **Detección de tejido en regiones sin cristal**: si una anotación cae entera

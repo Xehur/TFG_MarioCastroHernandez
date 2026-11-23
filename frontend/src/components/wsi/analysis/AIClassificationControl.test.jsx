@@ -24,7 +24,12 @@ function makeViewer() {
 
 const SAMPLE = {
   result_data: {
-    model: { id: 'inceptionv3-bach-he', dataset: 'BACH (ICIAR 2018) Photos' },
+    model: {
+      id: 'inceptionv3-bach-he',
+      dataset: 'BACH (ICIAR 2018) Photos',
+      device: 'cuda',
+      gpu_name: 'AMD Radeon RX 7800 XT',
+    },
     dominant_class: 'INVASIVE',
     dominant_group: 'Carcinoma invasivo',
     tissue_patches: 12,
@@ -87,6 +92,7 @@ describe('AIClassificationControl', () => {
     expect(screen.queryByText('Benigno')).not.toBeInTheDocument();
     expect(screen.getByText('Ocultar')).toBeInTheDocument();
     expect(screen.getByText('BACH (ICIAR 2018) Photos')).toBeInTheDocument();
+    expect(screen.getByText('GPU')).toBeInTheDocument();
     expect(
       screen.getByText(/12 de 12 campos con tejido analizados · campo ≈ 860×645 µm/)
     ).toBeInTheDocument();

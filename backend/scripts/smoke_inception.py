@@ -1,5 +1,5 @@
 """
-Smoke test en CPU del checkpoint InceptionV3 (tejido mamario, BACH).
+Smoke test (CPU o GPU) del checkpoint InceptionV3 (tejido mamario, BACH).
 
 Comprueba que:
   1. El checkpoint carga con ``weights_only=True`` y encaja con la arquitectura.
@@ -60,6 +60,9 @@ def main() -> int:
     parser.add_argument("--weights", default=settings.INCEPTION_WEIGHTS_PATH)
     parser.add_argument("--images", help="Imagen o carpeta de imágenes de prueba")
     parser.add_argument("--limit", type=int, default=25, help="Máx. imágenes por clase")
+    parser.add_argument(
+        "--device", default=settings.AI_DEVICE, help="cpu, cuda/gpu o auto (por defecto AI_DEVICE)"
+    )
     args = parser.parse_args()
 
     import torch
@@ -67,13 +70,14 @@ def main() -> int:
 
     torch.manual_seed(0)
     clf = InceptionClassifier(
-        args.weights, expected_sha256=settings.INCEPTION_WEIGHTS_SHA256
+        args.weights, device=args.device, expected_sha256=settings.INCEPTION_WEIGHTS_SHA256
     ).load()
     print(f"[OK] Checkpoint cargado: {args.weights}")
     print(f"     sha256={clf.sha256}")
     matches = clf.sha256 == settings.INCEPTION_WEIGHTS_SHA256
     print(f"     sha256 esperado: {'coincide' if matches else 'NO coincide'}")
     print(f"     clases={MODEL_CLASSES}  transform_input={clf._model.transform_input}")
+    print(f"     dispositivo={clf.device}" + (f" ({clf.gpu_name})" if clf.gpu_name else ""))
 
     # Imagen sintética reproducible (H&E aproximado).
     rng = np.random.default_rng(0)
@@ -87,7 +91,10 @@ def main() -> int:
     assert probs.shape == (4, 4), probs.shape
     assert np.isfinite(probs).all()
     assert np.allclose(probs.sum(axis=1), 1.0, atol=1e-4)
-    print(f"[OK] Salida (N,4) finita, filas suman 1. {dt / 4 * 1000:.0f} ms/imagen en CPU")
+    print(
+        "[OK] Salida (N,4) finita, filas suman 1. "
+        f"{dt / 4 * 1000:.0f} ms/imagen en {clf.device.upper()}"
+    )
 
     # Referencia independiente con torchvision (mismo pipeline que finetune.py).
     from torchvision import transforms
@@ -99,11 +106,12 @@ def main() -> int:
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ]
     )
-    x = torch.stack([ref_tf(Image.fromarray(a)) for a in synth])
+    x = torch.stack([ref_tf(Image.fromarray(a)) for a in synth]).to(clf.device)
     with torch.inference_mode():
-        ref = torch.softmax(clf._model(x), dim=1).numpy()
+        ref = torch.softmax(clf._model(x), dim=1).cpu().numpy()
     max_diff = float(np.abs(ref - probs).max())
-    assert max_diff < 1e-5, max_diff
+    # En GPU hay pequeñas diferencias numéricas respecto a la CPU.
+    assert max_diff < (1e-5 if clf.device == "cpu" else 1e-3), max_diff
     print(f"[OK] Wrapper == referencia torchvision (máx. dif. {max_diff:.2e})")
 
     if not args.images:

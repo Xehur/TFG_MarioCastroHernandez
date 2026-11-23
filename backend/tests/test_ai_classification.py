@@ -459,3 +459,55 @@ def test_campo_se_centra_en_el_tejido_de_la_celda():
     # desplaza hacia él en lugar de quedarse en x = 860.
     assert _FakeSlide.centers
     assert all(cx < 400 for cx, _ in _FakeSlide.centers)
+
+
+# --- Selección de dispositivo (CPU / GPU) ------------------------------------
+
+@pytest.mark.parametrize(
+    "requested, gpu, expected",
+    [
+        ("cpu", True, "cpu"),
+        ("cuda", True, "cuda"),
+        ("gpu", True, "cuda"),
+        ("rocm", True, "cuda"),
+        ("auto", True, "cuda"),
+        ("auto", False, "cpu"),
+        ("cuda", False, "cpu"),   # se pide GPU pero no hay: CPU, sin fallar
+        ("tpu", True, "cpu"),     # valor inválido: CPU
+        ("", True, "cpu"),
+    ],
+)
+def test_resolver_dispositivo(monkeypatch, requested, gpu, expected):
+    monkeypatch.setattr(ic, "_gpu_available", lambda: gpu)
+    assert ic._resolve_device(requested) == expected
+
+
+def test_gpu_que_falla_vuelve_a_cpu(monkeypatch):
+    """Si la GPU se detecta pero falla al ejecutar (p. ej. arquitectura no
+    soportada), el modelo se queda en CPU y la app sigue funcionando."""
+    import torch
+
+    monkeypatch.setattr(ic, "_gpu_available", lambda: True)
+    clf = ic.InceptionClassifier("x.pth", device="cuda")
+    assert clf.device == "cuda"
+
+    class _Model(torch.nn.Module):
+        def forward(self, x):
+            raise RuntimeError("HIP error: invalid device function")
+
+        def to(self, device):
+            return self
+
+    model = clf._move_to_device(_Model())
+    assert clf.device == "cpu"
+    assert clf.gpu_name is None
+    assert model is not None
+
+
+def test_endpoint_estado_ia(client, monkeypatch):
+    monkeypatch.setattr(ic, "_gpu_available", lambda: False)
+    data = client.get("/health/ai").json()
+    assert data["requested_device"] == settings.AI_DEVICE
+    assert data["device"] == "cpu"
+    assert data["gpu_available"] is False
+    assert "torch_version" in data and "weights_found" in data

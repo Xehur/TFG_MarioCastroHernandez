@@ -83,7 +83,7 @@ COMMANDS: List[Dict[str, Any]] = [
     {
         "id": "classify-tissue-ai",
         "name": "Clasificar tejido (IA)",
-        "description": "Clasifica el tejido en categorías histológicas (tumoral, estroma, necrosis...) con un modelo de IA.",
+        "description": "Clasifica el tejido mamario (Normal, Benigno, Carcinoma in situ, Carcinoma invasivo) con el modelo de IA.",
         "category": CATEGORY_ANALYSIS,
         "icon": "Brain",
         "target": TARGET_BACKEND,
@@ -92,7 +92,7 @@ COMMANDS: List[Dict[str, Any]] = [
         "action": None,
         "route": None,
         "params": [_IMAGE_ID_PARAM],
-        "keywords": ["ia", "ai", "clasificacion", "tumor", "estroma", "necrosis", "deep learning"],
+        "keywords": ["ia", "ai", "clasificacion", "carcinoma", "invasivo", "benigno", "mama", "deep learning"],
     },
     # --- Visualización (las gestiona la UI) --------------------------------
     {

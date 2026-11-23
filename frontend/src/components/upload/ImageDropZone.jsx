@@ -14,18 +14,8 @@ const ImageDropZone = ({ onUploadComplete, onUploadError }) => {
   const [uploadStatus, setUploadStatus] = useState({}); // 'pending', 'uploading', 'success', 'error'
   const [errors, setErrors] = useState({});
 
-  // Tipos de archivo WSI aceptados
-  const ACCEPTED_TYPES = [
-    '.svs',
-    '.tif',
-    '.tiff',
-    '.ndpi',
-    '.vms',
-    '.vmu',
-    '.scn',
-    '.mrxs',
-    '.bif',
-  ];
+  // Tipos de archivo WSI aceptados (los mismos que valida el backend)
+  const ACCEPTED_TYPES = ['.svs', '.tif', '.tiff', '.mrxs'];
 
   const validateFile = file => {
     // Validar tipo de archivo
@@ -36,12 +26,12 @@ const ImageDropZone = ({ onUploadComplete, onUploadError }) => {
       };
     }
 
-    // Validar tamaño (máximo 2GB)
-    const maxSize = 2 * 1024 * 1024 * 1024; // 2GB
+    // Validar tamaño (máximo 10 GB, igual que MAX_FILE_SIZE del backend)
+    const maxSize = 10 * 1024 * 1024 * 1024;
     if (file.size > maxSize) {
       return {
         valid: false,
-        error: 'El archivo es demasiado grande (máximo 2GB)',
+        error: 'El archivo es demasiado grande (máximo 10 GB)',
       };
     }
 

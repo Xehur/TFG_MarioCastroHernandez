@@ -18,6 +18,10 @@ Salidas del modelo (orden exacto, ``ImageFolder`` ordena alfabéticamente):
 ``benign``, ``insitu``, ``invasive``, ``normal``. El "fondo" NO es una salida
 de la red: es la etiqueta de las celdas que no se analizan.
 
+Dispositivo (``AI_DEVICE``): ``cpu`` (por defecto), ``cuda``/``gpu`` (GPU NVIDIA
+con CUDA o AMD con ROCm; PyTorch usa el mismo dispositivo para ambas) o
+``auto``. Si se pide GPU y no está disponible o falla, se usa CPU con un aviso.
+
 Uso académico / de investigación. Las probabilidades softmax no están
 calibradas y no constituyen un diagnóstico clínico.
 """
@@ -48,7 +52,11 @@ MODEL_INPUT_SIZE = 299
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 
-SUPPORTED_DEVICES = ("cpu",)
+# Valores admitidos en AI_DEVICE. PyTorch expone tanto las GPU NVIDIA (CUDA)
+# como las AMD (ROCm) con el mismo dispositivo "cuda", así que "gpu", "cuda" y
+# "rocm" se resuelven igual; el backend real se indica en ``gpu_info()``.
+SUPPORTED_DEVICES = ("cpu", "cuda", "auto")
+_DEVICE_ALIASES = {"gpu": "cuda", "rocm": "cuda", "nvidia": "cuda", "amd": "cuda"}
 
 
 class ModelUnavailableError(RuntimeError):
@@ -63,16 +71,68 @@ def _sha256(path: str) -> str:
     return digest.hexdigest()
 
 
+def _gpu_available() -> bool:
+    """True si PyTorch ve una GPU utilizable (NVIDIA con CUDA o AMD con ROCm)."""
+    try:
+        import torch
+
+        return bool(torch.cuda.is_available())
+    except Exception:  # noqa: BLE001  (PyTorch ausente o mal instalado)
+        return False
+
+
 def _resolve_device(requested: str) -> str:
-    requested = (requested or "cpu").lower()
-    if requested == "auto":
-        return "cpu"
+    """Traduce ``AI_DEVICE`` al dispositivo real de PyTorch.
+
+    - ``cpu``: siempre CPU.
+    - ``cuda`` / ``gpu`` / ``rocm``: GPU si está disponible; si no, CPU con aviso
+      (la aplicación sigue funcionando, solo más despacio).
+    - ``auto``: GPU si está disponible, si no CPU.
+    """
+    requested = (requested or "cpu").strip().lower()
+    requested = _DEVICE_ALIASES.get(requested, requested)
     if requested not in SUPPORTED_DEVICES:
-        logger.warning(
-            "AI_DEVICE=%s no está soportado todavía; se usa CPU.", requested
-        )
+        logger.warning("AI_DEVICE=%s no es válido; se usa CPU.", requested)
         return "cpu"
-    return requested
+    if requested == "cpu":
+        return "cpu"
+    if _gpu_available():
+        return "cuda"
+    if requested == "cuda":
+        logger.warning(
+            "AI_DEVICE=%s pero PyTorch no detecta ninguna GPU (¿imagen de "
+            "Docker CPU, GPU no expuesta al contenedor o drivers?); se usa CPU.",
+            requested,
+        )
+    return "cpu"
+
+
+def gpu_info() -> Dict[str, Any]:
+    """Diagnóstico de PyTorch y de la GPU, sin cargar el modelo."""
+    info: Dict[str, Any] = {
+        "torch_version": None,
+        "build": None,
+        "gpu_available": False,
+        "gpu_name": None,
+    }
+    try:
+        import torch
+    except Exception:  # noqa: BLE001
+        return info
+    info["torch_version"] = torch.__version__
+    if getattr(torch.version, "hip", None):
+        info["build"] = f"rocm {torch.version.hip}"
+    elif getattr(torch.version, "cuda", None):
+        info["build"] = f"cuda {torch.version.cuda}"
+    else:
+        info["build"] = "cpu"
+    if _gpu_available():
+        info["gpu_available"] = True
+        try:
+            info["gpu_name"] = torch.cuda.get_device_name(0)
+        except Exception:  # noqa: BLE001
+            pass
+    return info
 
 
 def to_rgb_uint8(image: Any) -> np.ndarray:
@@ -101,7 +161,9 @@ class InceptionClassifier:
         expected_sha256: Optional[str] = None,
     ):
         self.weights_path = weights_path
+        self.requested_device = (device or "cpu").strip().lower()
         self.device = _resolve_device(device)
+        self.gpu_name: Optional[str] = None
         self.expected_sha256 = (expected_sha256 or "").lower() or None
         self.sha256: Optional[str] = None
         self._model = None
@@ -148,7 +210,7 @@ class InceptionClassifier:
             ) from exc
 
         model.eval()
-        model.to(self.device)
+        model = self._move_to_device(model)
         self._model = model
         self._transform = transforms.Compose(
             [
@@ -158,12 +220,38 @@ class InceptionClassifier:
             ]
         )
         logger.info(
-            "InceptionV3 cargado desde %s (sha256=%s, device=%s)",
+            "InceptionV3 cargado desde %s (sha256=%s, AI_DEVICE=%s -> %s%s)",
             path,
             self.sha256[:12],
+            self.requested_device,
             self.device,
+            f" [{self.gpu_name}]" if self.gpu_name else "",
         )
         return self
+
+    def _move_to_device(self, model):
+        """Lleva el modelo a la GPU y hace una inferencia de prueba. Si la GPU
+        falla (p. ej. arquitectura no soportada por la versión de ROCm/CUDA),
+        vuelve a CPU para que la aplicación siga funcionando."""
+        import torch
+
+        if self.device == "cpu":
+            return model.to("cpu")
+        try:
+            model = model.to(self.device)
+            with torch.inference_mode():
+                dummy = torch.zeros(1, 3, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE)
+                model(dummy.to(self.device))
+            torch.cuda.synchronize()
+            self.gpu_name = torch.cuda.get_device_name(0)
+            return model
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "No se pudo usar la GPU (%s); la IA se ejecutará en CPU.", exc
+            )
+            self.device = "cpu"
+            self.gpu_name = None
+            return model.to("cpu")
 
     # --- Inferencia ----------------------------------------------------------
 
@@ -204,6 +292,7 @@ class InceptionClassifier:
             "preprocessing_version": PREPROCESSING_VERSION,
             "weights_sha256": self.sha256,
             "device": self.device,
+            "gpu_name": self.gpu_name,
         }
 
 

@@ -1,4 +1,3 @@
-
 # Visor WSI con análisis de tejido e IA (histopatología mamaria)
 
 Aplicación web para **visualizar imágenes de portaobjetos completos (WSI)**,
@@ -190,7 +189,8 @@ Projecto_TFG/
 │   │       ├── commands/          # Catálogo y ejecutor de la paleta de comandos
 │   │       └── coco_service.py    # Conversión anotaciones <-> COCO
 │   ├── alembic/versions/          # Migraciones de la base de datos
-│   ├── scripts/smoke_inception.py # Prueba en CPU del checkpoint de la IA
+│   ├── scripts/smoke_inception.py # Prueba (CPU o GPU) del checkpoint de la IA
+│   ├── scripts/preparar_ejemplos_bach.py # Importa WSI de ejemplo de BACH con anotaciones
 │   ├── tests/                     # Pruebas pytest
 │   └── requirements.txt
 ├── frontend/
@@ -859,6 +859,15 @@ Cada variante construye su propia imagen del backend (`wsi-tfg-backend:cpu`,
 `backend.Dockerfile`) y fija `AI_DEVICE`. Si la GPU no está disponible, la IA
 funciona en CPU. Se comprueba en `http://localhost:8000/health/ai` o en la
 etiqueta CPU/GPU del panel de IA. Detalles en `docker/README.md`.
+
+**Imágenes de ejemplo.** Con la aplicación arrancada y una cuenta creada,
+`.\preparar_ejemplos.ps1` (o `sh preparar_ejemplos.sh`) descarga WSI del dataset
+público **BACH** de Kaggle (CC0) y las importa en esa cuenta junto con las
+regiones anotadas por patólogos, convertidas a polígonos con las clases
+«Benigno», «Carcinoma in situ» y «Carcinoma invasivo». Lo hace
+`backend/scripts/preparar_ejemplos_bach.py` dentro del contenedor: descarga cada
+WSI por separado (el dataset completo ocupa 18 GB), la sube con la API y lee el
+XML de Aperio ImageScope de sus anotaciones.
 
 ---
 

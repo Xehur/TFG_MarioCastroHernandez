@@ -56,6 +56,31 @@ termine:
 - Backend (API): http://localhost:8000
 - Estado de la IA: http://localhost:8000/health/ai
 
+### Imagenes de ejemplo (dataset BACH)
+
+Para probar la aplicacion sin tener WSI propias, el script `preparar_ejemplos`
+descarga WSI del dataset publico **BACH (ICIAR 2018)**
+([Kaggle](https://www.kaggle.com/datasets/truthisneverlinear/bach-breast-cancer-histology-images),
+licencia CC0) y las importa en tu cuenta, **junto con las regiones anotadas por
+patologos** (clases «Benigno», «Carcinoma in situ» y «Carcinoma invasivo»).
+
+Con la aplicacion arrancada y tu cuenta ya creada, desde `docker/`:
+
+```bash
+.\preparar_ejemplos.ps1
+```
+
+En Linux / macOS: `sh preparar_ejemplos.sh`. Pide el email y la contraseña de tu
+cuenta.
+
+- Por defecto importa **2 WSI** (`A03` y `A07`, ~350 MB de descarga). Para otra
+  cantidad: `.\preparar_ejemplos.ps1 -Count 4` o `sh preparar_ejemplos.sh --count 4`
+  (de 1 a 10; se eligen de menor a mayor tamaño, entre ~170 y ~300 MB cada una).
+- Sin las anotaciones: `-SinAnotaciones` / `--sin-anotaciones`.
+- No hace falta cuenta de Kaggle ni instalar nada: el script se ejecuta dentro
+  del contenedor del backend. Las descargas temporales se borran al terminar.
+- Volver a ejecutarlo es seguro: omite las WSI que ya estan en tu cuenta.
+
 Para pararlo (usa los mismos `-f` con los que lo arrancaste):
 
 ```bash
@@ -119,6 +144,8 @@ Notas sobre GPU:
   la IA en GPU que se combinan con el anterior.
 - `iniciar.ps1` / `iniciar.sh` — preparan `.env` y los pesos del modelo y montan
   la aplicacion preguntando CPU o GPU.
+- `preparar_ejemplos.ps1` / `preparar_ejemplos.sh` — descargan WSI de ejemplo del
+  dataset BACH con sus anotaciones y las importan en tu cuenta.
 - `backend.Dockerfile` — imagen del backend (dependencias de sistema para
   OpenSlide, PyTorch de la variante elegida, `requirements.txt`, entrypoint).
 - `backend-entrypoint.sh` — ejecuta `alembic upgrade head` y luego `uvicorn`.

@@ -1,3 +1,4 @@
+
 # Visor WSI con análisis de tejido e IA (histopatología mamaria)
 
 Aplicación web para **visualizar imágenes de portaobjetos completos (WSI)**,

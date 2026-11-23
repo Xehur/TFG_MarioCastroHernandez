@@ -1,0 +1,54 @@
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-menu-email {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.user-menu-email:hover {
+  background: rgba(178, 69, 146, 0.2);
+  border-color: rgba(178, 69, 146, 0.6);
+}
+
+.user-menu-email .lucide {
+  color: #cf8fd8;
+}
+
+.user-menu-gear {
+  margin-left: 2px;
+  opacity: 0.75;
+}
+
+.user-menu-logout {
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.user-menu-logout:hover {
+  background: rgba(255, 107, 157, 0.2);
+  border-color: #ff6b9d;
+}

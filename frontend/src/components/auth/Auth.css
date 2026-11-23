@@ -1,0 +1,317 @@
+/* ---------- Base ---------- */
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(120, 60, 130, 0.35), transparent),
+    linear-gradient(135deg, #14101f 0%, #221335 45%, #3a1a4d 100%);
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-card {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 420px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 18px;
+  padding: 36px 34px;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.45),
+    0 2px 8px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(6px);
+  animation: auth-rise 0.5s ease;
+}
+
+@keyframes auth-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auth-card-head {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.auth-card-logo {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #8e2de2 0%, #b24592 100%);
+  box-shadow: 0 8px 20px rgba(142, 45, 226, 0.4);
+}
+
+.auth-card h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+  color: #1c1330;
+  text-align: center;
+}
+
+.auth-subtitle {
+  margin: 0;
+  color: #6b6280;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* ---------- Form ---------- */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.auth-field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #3a3450;
+}
+
+.auth-field input {
+  padding: 12px 14px;
+  border: 1px solid #ddd6e6;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #1c1330;
+  background: #faf8fd;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    background 0.2s;
+}
+
+.auth-field input::placeholder {
+  color: #9b93ad;
+}
+
+.auth-field input:focus {
+  outline: none;
+  border-color: #9333ea;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.15);
+}
+
+.auth-button {
+  margin-top: 8px;
+  padding: 13px;
+  background: linear-gradient(135deg, #8e2de2 0%, #b24592 100%);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  transition:
+    transform 0.15s,
+    box-shadow 0.2s,
+    opacity 0.2s;
+  box-shadow: 0 10px 24px rgba(142, 45, 226, 0.35);
+}
+
+.auth-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px rgba(142, 45, 226, 0.45);
+}
+
+.auth-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.auth-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auth-error {
+  background: #fde8e8;
+  color: #c0392b;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.auth-footer {
+  margin-top: 22px;
+  text-align: center;
+  font-size: 14px;
+  color: #6b6280;
+}
+
+.auth-footer a {
+  color: #9333ea;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.auth-footer a:hover {
+  text-decoration: underline;
+}
+
+/* ---------- Split layout with medical hero ---------- */
+.auth-split {
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0;
+}
+
+.auth-hero {
+  position: relative;
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-image: url('../../assets/histology-bg.svg');
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+}
+
+.auth-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    160deg,
+    rgba(24, 12, 38, 0.55) 0%,
+    rgba(58, 26, 77, 0.65) 100%
+  );
+}
+
+.auth-hero-content {
+  position: relative;
+  z-index: 1;
+  max-width: 460px;
+  padding: 48px;
+  color: #fff;
+}
+
+.auth-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+  margin-bottom: 32px;
+}
+
+.auth-brand-logo {
+  width: 84px;
+  height: 84px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #8e2de2 0%, #b24592 100%);
+  box-shadow: 0 12px 30px rgba(142, 45, 226, 0.5);
+}
+
+.auth-brand-name {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.35);
+}
+
+.auth-hero-title {
+  font-size: 34px;
+  line-height: 1.2;
+  margin: 0 0 16px;
+  font-weight: 800;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.35);
+}
+
+.auth-hero-text {
+  font-size: 16px;
+  line-height: 1.6;
+  margin: 0 0 28px;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.auth-hero-features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth-hero-features li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.auth-hero-features li svg {
+  flex: 0 0 auto;
+  padding: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.auth-split .auth-card {
+  flex: 0 0 460px;
+  max-width: 460px;
+  align-self: center;
+  margin: 24px;
+}
+
+@media (max-width: 880px) {
+  .auth-hero {
+    display: none;
+  }
+  .auth-split {
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background-image: url('../../assets/histology-bg.svg');
+    background-size: cover;
+    background-position: center;
+  }
+  .auth-split .auth-card {
+    flex: 1 1 auto;
+    margin: 0;
+  }
+}
+
+/* ---------- Loading ---------- */
+.auth-loading {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #14101f;
+  color: #fff;
+}

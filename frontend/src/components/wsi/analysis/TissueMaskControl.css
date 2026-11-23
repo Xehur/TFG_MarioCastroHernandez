@@ -1,0 +1,142 @@
+.tissue-control {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(178, 69, 146, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tissue-control-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e8e0f0;
+}
+
+.tissue-control-header .lucide {
+  color: #cf8fd8;
+}
+
+.tissue-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid rgba(178, 69, 146, 0.35);
+  border-radius: 8px;
+  background: rgba(142, 45, 226, 0.15);
+  color: #d8c6ec;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.tissue-toggle:hover:not(:disabled) {
+  background: rgba(142, 45, 226, 0.3);
+  border-color: #b24592;
+}
+
+.tissue-toggle.active {
+  background: linear-gradient(135deg, #8e2de2 0%, #b24592 100%);
+  color: #fff;
+  border-color: transparent;
+}
+
+.tissue-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tissue-opacity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tissue-opacity label {
+  font-size: 12px;
+  color: #b9a8cc;
+}
+
+.tissue-opacity input[type='range'] {
+  flex: 1;
+  accent-color: #b24592;
+}
+
+.tissue-opacity-value {
+  font-size: 12px;
+  color: #d8c6ec;
+  min-width: 34px;
+  text-align: right;
+}
+
+.tissue-stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tissue-stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.tissue-stat-label {
+  font-size: 11px;
+  color: #b9a8cc;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.tissue-stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #4ade80;
+}
+
+.tissue-reanalyze {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border: 1px solid rgba(178, 69, 146, 0.35);
+  border-radius: 7px;
+  background: transparent;
+  color: #cf8fd8;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.tissue-reanalyze:hover:not(:disabled) {
+  background: rgba(142, 45, 226, 0.2);
+}
+
+.tissue-reanalyze:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tissue-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  color: #ff6b9d;
+}
+
+.tissue-spin {
+  animation: tissue-spin 0.8s linear infinite;
+}
+
+@keyframes tissue-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

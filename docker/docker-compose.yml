@@ -1,0 +1,74 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD en docker/.env}
+      POSTGRES_DB: ${DB_NAME:-wsi_db}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-wsi_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  # IA en CPU por defecto. Para usar una GPU, combina este fichero con
+  # docker-compose.gpu-nvidia.yml o docker-compose.gpu-amd.yml (ver README.md
+  # de esta carpeta o los scripts iniciar.ps1 / iniciar.sh).
+  backend:
+    image: wsi-tfg-backend:cpu
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+      args:
+        TORCH_INDEX_URL: https://download.pytorch.org/whl/cpu
+    environment:
+      # Dispositivo de la IA: cpu | cuda (= gpu) | auto
+      AI_DEVICE: ${AI_DEVICE:-cpu}
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:?Define DB_PASSWORD en docker/.env}@db:5432/${DB_NAME:-wsi_db}
+      SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en docker/.env}
+      # Origen(es) del frontend que pueden llamar a la API (JSON)
+      CORS_ORIGINS: '${CORS_ORIGINS:-["http://localhost:5173"]}'
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
+      ENVIRONMENT: production
+      DEBUG: "false"
+      # Documentacion interactiva (/docs): desactivada salvo ENABLE_DOCS=true en .env
+      ENABLE_DOCS: ${ENABLE_DOCS:-false}
+      # Checkpoint InceptionV3 (no se copia en la imagen; se monta en /models)
+      INCEPTION_WEIGHTS_PATH: /models/HE_inceptionv3.pth
+    volumes:
+      # Persiste las imagenes WSI subidas y los overlays de analisis cacheados
+      - uploads_data:/app/uploads
+      # Pesos del clasificador IA (solo lectura)
+      - ../InceptionV3:/models:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    # Expuesto porque el navegador llama a la API directamente (VITE_API_BASE_URL)
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  uploads_data:

@@ -1,0 +1,31 @@
+# IA en GPU AMD (ROCm). Se combina con el fichero principal:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.gpu-amd.yml up --build
+#
+# Requisitos del equipo anfitrión:
+#   - SOLO Linux, con el driver amdgpu de ROCm instalado (deben existir /dev/kfd y
+#     /dev/dri). Docker Desktop en Windows NO expone las GPU AMD a los
+#     contenedores: en Windows usa la variante CPU.
+#   - Una GPU compatible con ROCm (p. ej. Radeon RX 7000 / Instinct).
+# Si la GPU no está disponible o no es compatible, la IA sigue funcionando en CPU
+# (aviso en el log).
+services:
+  backend:
+    image: wsi-tfg-backend:rocm
+    build:
+      args:
+        # ROCm 7.1 (también existe rocm7.2: TORCH_ROCM_INDEX_URL en docker/.env).
+        TORCH_INDEX_URL: ${TORCH_ROCM_INDEX_URL:-https://download.pytorch.org/whl/rocm7.1}
+    environment:
+      AI_DEVICE: cuda  # PyTorch expone las GPU ROCm como dispositivo "cuda"
+      AI_BATCH_SIZE: ${AI_BATCH_SIZE:-32}
+      # Solo si la GPU no está en la lista oficial de ROCm y /health/ai indica CPU,
+      # descomenta la línea siguiente para forzar la familia RDNA3 (RX 7000):
+      # HSA_OVERRIDE_GFX_VERSION: "11.0.0"
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add:
+      - video
+    security_opt:
+      - seccomp=unconfined

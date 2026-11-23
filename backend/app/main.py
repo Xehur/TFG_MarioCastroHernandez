@@ -1,0 +1,91 @@
+"""
+Aplicación principal FastAPI
+"""
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.config import settings
+from app.logging_config import setup_logging
+from app.middleware import add_process_time_header
+from app.routers import health, users, images, auth, annotations, coco, analysis, commands
+
+# Setup logging
+logger = setup_logging()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Maneja el ciclo de vida de la aplicación
+    """
+    # Startup
+    logger.info(f"Iniciando {settings.APP_NAME} v{settings.APP_VERSION}")
+    logger.info(f"Ambiente: {settings.ENVIRONMENT}")
+    logger.info(f"Debug: {settings.DEBUG}")
+
+    yield
+
+    # Shutdown
+    logger.info("Cerrando aplicación")
+
+
+# Crear aplicación FastAPI
+app = FastAPI(
+    title=settings.APP_NAME,
+    description=settings.APP_DESCRIPTION,
+    version=settings.APP_VERSION,
+    debug=settings.DEBUG,
+    lifespan=lifespan,
+    # En producción la documentación interactiva se oculta (ver ENABLE_DOCS).
+    docs_url="/docs" if settings.docs_enabled else None,
+    redoc_url="/redoc" if settings.docs_enabled else None,
+    openapi_url="/openapi.json" if settings.docs_enabled else None,
+)
+
+# Configurar CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+    allow_methods=settings.CORS_ALLOW_METHODS,
+    allow_headers=settings.CORS_ALLOW_HEADERS,
+)
+
+# Middleware personalizado
+app.middleware("http")(add_process_time_header)
+
+# Incluir routers
+app.include_router(health.router)
+app.include_router(auth.router)
+app.include_router(users.router)
+app.include_router(images.router)
+app.include_router(annotations.router)
+app.include_router(coco.router)
+app.include_router(analysis.router)
+app.include_router(commands.router)
+
+@app.get("/")
+async def root():
+    """
+    Endpoint raíz - información de la API
+    """
+    return {
+        "message": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "description": settings.APP_DESCRIPTION,
+        "docs": "/docs" if settings.docs_enabled else None,
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        app,
+        host=settings.API_HOST,
+        port=settings.API_PORT,
+        reload=settings.DEBUG
+    )

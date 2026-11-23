@@ -1,0 +1,215 @@
+.image-viewer-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(120, 60, 130, 0.3), transparent),
+    linear-gradient(135deg, #14101f 0%, #221335 45%, #2c163d 100%);
+  color: #fff;
+}
+
+.image-viewer-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 15px 20px;
+  background: rgba(28, 19, 48, 0.85);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.back-button:hover {
+  background: rgba(178, 69, 146, 0.2);
+  border-color: #b24592;
+}
+
+.analytics-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #8e2de2 0%, #b24592 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+}
+
+.analytics-open-btn:hover {
+  opacity: 0.9;
+}
+
+.palette-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.palette-open-btn:hover {
+  background: rgba(178, 69, 146, 0.2);
+  border-color: #b24592;
+}
+
+.palette-kbd {
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(178, 69, 146, 0.25);
+  border: 1px solid rgba(178, 69, 146, 0.35);
+  color: #e8e0f0;
+  font-size: 11px;
+  font-family: inherit;
+}
+
+.image-info {
+  flex: 1;
+}
+
+.image-info h1 {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.image-metadata {
+  display: flex;
+  gap: 20px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.image-metadata span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.image-metadata .lucide {
+  color: #cf8fd8;
+}
+
+.viewer-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.image-viewer-content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.viewer-side-panel {
+  width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: rgba(28, 19, 48, 0.92);
+  backdrop-filter: blur(8px);
+  border-left: 1px solid rgba(178, 69, 146, 0.2);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Los paneles apilados mantienen su altura natural; el propio panel lateral
+   se desplaza para que ninguno (p. ej. la lista de anotaciones) quede oculto
+   cuando otro se expande (p. ej. los resultados de clasificación IA). */
+.viewer-side-panel > * {
+  flex-shrink: 0;
+}
+
+.viewer-side-panel .annotation-panel {
+  width: 100%;
+  border-left: none;
+  flex: 0 0 auto;
+}
+
+.image-viewer-page.loading,
+.image-viewer-page.error {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 40px;
+}
+
+.image-viewer-page.error h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ff6b9d;
+  margin-bottom: 20px;
+}
+
+.image-viewer-page.error p {
+  color: #ccc;
+  margin-bottom: 30px;
+  font-size: 16px;
+}
+
+.image-viewer-page.error button {
+  padding: 12px 24px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.image-viewer-page.error button:hover {
+  background: rgba(178, 69, 146, 0.2);
+  border-color: #b24592;
+}
+
+.spinner {
+  border: 4px solid rgba(255, 255, 255, 0.25);
+  border-top: 4px solid #b24592;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

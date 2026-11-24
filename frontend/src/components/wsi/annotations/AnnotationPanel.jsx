@@ -80,7 +80,7 @@ const AnnotationPanel = ({
               <span className="item-color" style={{ background: ann.color }} />
               <span className="item-shape">{ShapeIcon ? <ShapeIcon size={16} /> : '?'}</span>
               <div className="item-body">
-                <span className="item-label">{ann.label || '(sin etiqueta)'}</span>
+                <span className="item-label">{ann.label || '(sin nombre)'}</span>
                 {classNameOf(ann.class_id) && (
                   <span className="item-class">{classNameOf(ann.class_id)}</span>
                 )}

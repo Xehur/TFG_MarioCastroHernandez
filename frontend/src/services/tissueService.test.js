@@ -51,4 +51,23 @@ describe('tissueService', () => {
     expect(apiClient.post).toHaveBeenCalledWith('/images/9/analyze/tissue');
     expect(result.id).toBe(1);
   });
+
+  it('analyze() envía el factor de umbral elegido', async () => {
+    apiClient.post.mockResolvedValue({ data: { id: 2 } });
+    await tissueService.analyze(9, { thresholdFactor: 1.5 });
+    expect(apiClient.post).toHaveBeenCalledWith('/images/9/analyze/tissue', null, {
+      params: { threshold_factor: 1.5 },
+    });
+  });
+
+  it('getPreview() pide la vista previa y lee el % de tejido de la cabecera', async () => {
+    const blob = new Blob(['x'], { type: 'image/png' });
+    apiClient.get.mockResolvedValue({ data: blob, headers: { 'x-tissue-percent': '18.25' } });
+    const result = await tissueService.getPreview(4, 2);
+    expect(apiClient.get).toHaveBeenCalledWith('/images/4/tissue-mask/preview', {
+      params: { threshold_factor: 2 },
+      responseType: 'blob',
+    });
+    expect(result).toEqual({ url: 'blob:mock-url', tissuePercent: 18.25 });
+  });
 });

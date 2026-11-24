@@ -67,8 +67,8 @@ const Settings = () => {
       setConfirmPassword('');
       setSuccess('Cambios guardados correctamente.');
     } catch (err) {
-      const detail = err.response?.data?.detail || 'No se pudieron guardar los cambios.';
-      setError(typeof detail === 'string' ? detail : 'Error al guardar los cambios.');
+      // El interceptor de api.js entrega un ApiError con el motivo ya legible.
+      setError(err?.message || 'No se pudieron guardar los cambios.');
     } finally {
       setSubmitting(false);
     }

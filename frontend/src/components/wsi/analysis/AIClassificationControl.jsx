@@ -225,8 +225,8 @@ const AIClassificationControl = forwardRef(({ viewer, imageId }, ref) => {
                 .join('×')} µm`
             : ''}
           {stats.sampling?.sampled ? ' · muestreado' : ''}
-          {stats.sampling?.inferred_cells > 0
-            ? ' · zonas más claras: clase del campo vecino'
+          {stats.sampling?.attenuated_cells > 0
+            ? ' · zonas más claras: no evaluadas (clase del campo vecino)'
             : ''}
         </p>
       )}

@@ -31,8 +31,8 @@ const Register = () => {
       await register({ email, password, fullName });
       navigate('/', { replace: true });
     } catch (err) {
-      const detail = err.response?.data?.detail || 'No se pudo completar el registro.';
-      setError(typeof detail === 'string' ? detail : 'Error de registro.');
+      // El interceptor de api.js entrega un ApiError con el motivo ya legible.
+      setError(err?.message || 'No se pudo completar el registro.');
     } finally {
       setSubmitting(false);
     }

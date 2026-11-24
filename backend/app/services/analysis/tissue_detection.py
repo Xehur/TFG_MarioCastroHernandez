@@ -45,10 +45,32 @@ from skimage.morphology import (
 DETECTOR_METHOD = "od_hysteresis"
 DETECTOR_VERSION = "od-hysteresis-v2"
 
+# Factor de umbral ajustable por el usuario: multiplica los umbrales que el
+# detector calcula automáticamente. 1.0 = detección automática; < 1 detecta más
+# tejido (umbral más bajo) y > 1, menos.
+DEFAULT_THRESHOLD_FACTOR = 1.0
+MIN_THRESHOLD_FACTOR = 0.25
+MAX_THRESHOLD_FACTOR = 3.0
 
-def is_current_detector(data: Optional[Dict[str, Any]]) -> bool:
-    """True si un resultado cacheado se generó con el detector actual."""
-    return bool(data) and data.get("detector_version") == DETECTOR_VERSION
+
+def clamp_threshold_factor(value: Optional[float]) -> float:
+    """Normaliza el factor de umbral al rango admitido (None -> 1.0)."""
+    if value is None:
+        return DEFAULT_THRESHOLD_FACTOR
+    return round(
+        float(min(MAX_THRESHOLD_FACTOR, max(MIN_THRESHOLD_FACTOR, value))), 3
+    )
+
+
+def is_current_detector(
+    data: Optional[Dict[str, Any]], threshold_factor: float = DEFAULT_THRESHOLD_FACTOR
+) -> bool:
+    """True si un resultado cacheado se generó con el detector actual y el
+    mismo factor de umbral."""
+    if not data or data.get("detector_version") != DETECTOR_VERSION:
+        return False
+    stored = data.get("threshold_factor", DEFAULT_THRESHOLD_FACTOR)
+    return abs(float(stored) - float(threshold_factor)) < 1e-6
 
 
 @dataclass
@@ -78,7 +100,9 @@ class TissueDetectionResult:
 class TissueDetector:
     """Interfaz de un detector de tejido."""
 
-    def detect(self, rgb: np.ndarray) -> TissueDetectionResult:  # pragma: no cover
+    def detect(
+        self, rgb: np.ndarray, threshold_factor: float = DEFAULT_THRESHOLD_FACTOR
+    ) -> TissueDetectionResult:  # pragma: no cover
         raise NotImplementedError
 
 
@@ -139,7 +163,13 @@ class ClassicalTissueDetector(TissueDetector):
         self.od_floor = od_floor
         self.noise_k = noise_k
 
-    def detect(self, rgb: np.ndarray) -> TissueDetectionResult:
+    def detect(
+        self, rgb: np.ndarray, threshold_factor: float = DEFAULT_THRESHOLD_FACTOR
+    ) -> TissueDetectionResult:
+        """Detecta el tejido. ``threshold_factor`` escala los umbrales
+        automáticos (fuerte, débil y de saturación) para que el usuario pueda
+        hacer la detección más o menos estricta."""
+        factor = clamp_threshold_factor(threshold_factor)
         rgb = _to_rgb_float(rgb)
         height, width = rgb.shape[0], rgb.shape[1]
         empty = np.zeros((height, width), dtype=bool)
@@ -169,17 +199,18 @@ class ClassicalTissueDetector(TissueDetector):
         # 3) Umbrales fuerte (Otsu) y débil (ruido del fondo).
         valid = od[~pen]
         if valid.size == 0 or float(np.ptp(valid)) < 1e-6:
-            return self._result(empty, None, None, width, height, background, pen)
+            return self._result(empty, None, None, width, height, background, pen, factor)
         # Otsu sobre la OD recortada: unos pocos píxeles extremos (polvo,
         # restos de tinta) no deben desplazar el umbral.
-        t_high = float(threshold_otsu(np.minimum(valid, np.percentile(valid, 99.5))))
-        bg = od[(od < t_high) & ~pen]
+        t_auto = float(threshold_otsu(np.minimum(valid, np.percentile(valid, 99.5))))
+        bg = od[(od < t_auto) & ~pen]
         med = float(np.median(bg)) if bg.size else 0.0
         mad = float(np.median(np.abs(bg - med))) if bg.size else 0.0
-        t_low = min(max(med + self.noise_k * 1.4826 * mad, self.od_floor), t_high)
+        t_high = t_auto * factor
+        t_low = min(max(med + self.noise_k * 1.4826 * mad, self.od_floor) * factor, t_high)
 
         strong = (od > t_high) & ~pen
-        weak = ((od > t_low) | (sat > self.weak_sat)) & ~pen
+        weak = ((od > t_low) | (sat > self.weak_sat * factor)) & ~pen
 
         # 4) Histéresis: regiones débiles conectadas a alguna región fuerte.
         weak = closing(weak, disk(2))
@@ -194,9 +225,9 @@ class ClassicalTissueDetector(TissueDetector):
         mask &= ~pen
         mask = _drop_ink_components(mask, hue, sat)
         mask = self._clean_mask(mask)
-        return self._result(mask, t_high, t_low, width, height, background, pen)
+        return self._result(mask, t_high, t_low, width, height, background, pen, factor)
 
-    def _result(self, mask, t_high, t_low, width, height, background, pen):
+    def _result(self, mask, t_high, t_low, width, height, background, pen, factor):
         tissue_percent = float(mask.mean() * 100.0) if mask.size else 0.0
         return TissueDetectionResult(
             mask=mask,
@@ -208,6 +239,7 @@ class ClassicalTissueDetector(TissueDetector):
             extra={
                 "method": DETECTOR_METHOD,
                 "detector_version": DETECTOR_VERSION,
+                "threshold_factor": factor,
                 "od_threshold_high": None if t_high is None else round(t_high, 4),
                 "od_threshold_low": None if t_low is None else round(t_low, 4),
                 "background_rgb": [int(round(v * 255)) for v in background],
@@ -222,12 +254,15 @@ class ClassicalTissueDetector(TissueDetector):
         area = mask.size
         if self.closing_radius > 0:
             mask = closing(mask, disk(self.closing_radius))
+        # scikit-image 0.26 sustituye area_threshold/min_size por max_size. Con la
+        # versión fijada en requirements.txt, el parámetro antiguo ya se trataba
+        # como max_size (elimina tamaños <= umbral), así que el resultado es el mismo.
         hole = max(self.min_hole_size, int(area * self.min_hole_frac))
         if hole > 0:
-            mask = remove_small_holes(mask, hole)
+            mask = remove_small_holes(mask, max_size=hole)
         obj = max(self.min_object_size, int(area * self.min_object_frac))
         if obj > 0:
-            mask = remove_small_objects(mask, obj)
+            mask = remove_small_objects(mask, max_size=obj)
         return mask
 
 
@@ -319,9 +354,11 @@ def get_tissue_detector() -> TissueDetector:
     return _default_detector
 
 
-def detect_tissue(rgb: np.ndarray) -> TissueDetectionResult:
+def detect_tissue(
+    rgb: np.ndarray, threshold_factor: float = DEFAULT_THRESHOLD_FACTOR
+) -> TissueDetectionResult:
     """Atajo que usa el detector activo."""
-    return get_tissue_detector().detect(rgb)
+    return get_tissue_detector().detect(rgb, threshold_factor=threshold_factor)
 
 
 def mask_to_rgba_overlay(

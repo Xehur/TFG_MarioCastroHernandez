@@ -205,15 +205,18 @@ Las anotaciones marcan zonas de interés de la imagen y se guardan automáticame
    Pulsa **Esc** en cualquier momento para cancelar la figura y volver a
    «Seleccionar».
 
-3. Al terminar la figura se abre la ventana **«Clasificar anotación»**:
+3. Al terminar la figura se abre la ventana **«Nueva anotación»**:
 
-   ![Clasificar una anotación](docs/manual/img/12-clasificar-anotacion.jpg)
+   ![Nueva anotación](docs/manual/img/12-clasificar-anotacion.jpg)
 
-   - **Etiqueta:** un nombre libre (p. ej. «Zona densa»).
-   - **Clasificación:** una de tus clases (p. ej. «Tumor»). Para crear una nueva,
-     pulsa **«+ Nueva clase»** y elige nombre y color.
+   - **Nombre de la anotación:** un nombre libre (p. ej. «Zona de interés»).
+   - **Clasificación (opcional):** una de tus clases (p. ej. «Tumor»). Para crear
+     una nueva, pulsa **«+ Nueva clase»** y elige nombre y color. Si dejas
+     **«Ninguna: solo nombre»**, la zona se guarda solo con su nombre, sin
+     pertenecer a ninguna clase.
    - **Color** de la anotación.
-   - Pulsa **«Guardar»**, o **«Cancelar»** para dejarla sin clasificar.
+   - Pulsa **«Guardar»** (hace falta al menos un nombre o una clase), o
+     **«Cancelar»** para descartar la figura.
 
 Para volver a mover la imagen con el ratón, selecciona de nuevo la herramienta
 **«Seleccionar»**.
@@ -227,7 +230,7 @@ imagen. Puedes ajustar el **tamaño** de sus celdas (en píxeles de la imagen) y
 ### Lista de anotaciones
 
 Al final del panel lateral aparecen todas las anotaciones de la imagen, con su
-color, forma, etiqueta y clase.
+color, forma, nombre y clase (si la tiene).
 
 ![Lista de anotaciones](docs/manual/img/11-panel-anotaciones.jpg)
 
@@ -237,7 +240,7 @@ Cada anotación tiene cuatro botones:
 |---|---|
 | **Diana** (Centrar) | Mueve la vista para centrar la anotación |
 | **Gráfico** (Analizar región) | Analiza solo esa zona y abre su dashboard ([sección 12](#12-analizar-solo-una-región)) |
-| **Lápiz** (Editar) | Cambia su etiqueta, clase o color |
+| **Lápiz** (Editar) | Cambia su nombre, clase o color |
 | **Papelera** (Eliminar) | Borra la anotación al momento (no pide confirmación) |
 
 ---
@@ -268,6 +271,24 @@ cristal del portaobjetos.
 El bloque indica el **% de la imagen** que es tejido. La detección reconoce
 también el tejido muy pálido (grasa, estroma laxo) y descarta las marcas de
 rotulador y los bordes del escáner.
+
+#### Ajustar el umbral de detección
+
+El umbral se calcula automáticamente para cada imagen. Si la máscara deja fuera
+tejido pálido o incluye partes del cristal, puedes ajustarlo:
+
+1. Mueve el deslizador **«Umbral de detección»**: hacia **«Más tejido»** incluye
+   zonas más claras y hacia **«Menos tejido»** las excluye. El valor ×1,00 es el
+   automático.
+2. Al moverlo verás al momento una **vista previa** de la máscara y su
+   porcentaje («Vista previa: X % de tejido (sin guardar)»). Todavía no se ha
+   guardado nada.
+3. Pulsa **«Aplicar»** para guardar el nuevo umbral, o **«Descartar»** para
+   volver a la máscara anterior.
+4. **«Volver al umbral automático»** restablece el valor inicial.
+
+El umbral aplicado se usa también en el **mapa de densidad** y en la
+**clasificación IA**, que se recalculan la próxima vez que los abras.
 
 ### Mapa de densidad
 
@@ -316,10 +337,19 @@ cuatro clases:
 
 Cómo interpretar el mapa:
 - Cada **rectángulo de color** es un campo que el modelo ha analizado.
-- Las zonas **más claras** (normalmente en los bordes del tejido) no se han
-  analizado directamente: toman la clase del campo vecino y **no cuentan** en los
-  porcentajes.
+- Los bordes del tejido toman el color de la clase del campo más cercano, con la
+  misma intensidad.
+- En imágenes con mucho tejido solo se analiza una muestra de campos. En ese caso,
+  las zonas **más claras** no se han analizado directamente: toman la clase del
+  campo vecino y **no cuentan** en los porcentajes. La leyenda del panel lo indica.
 - Los porcentajes son **de campos analizados**, no de superficie exacta.
+
+> **Fiabilidad del modelo.** En una validación con seis imágenes del conjunto BACH
+> anotadas por patólogos, el modelo detectó la mayoría de las zonas de carcinoma,
+> pero acertó solo unas dos de cada tres zonas en total y clasificó a menudo como
+> **carcinoma invasivo** tejido no tumoral. Toma con especial cautela un
+> porcentaje alto de invasivo sobre toda la imagen. El informe completo está en
+> [docs/evaluacion/validacion_ia_bach.md](docs/evaluacion/validacion_ia_bach.md).
 
 ---
 
@@ -367,8 +397,16 @@ una imagen independiente:
 ![Dashboard de una región](docs/manual/img/16-dashboard-region.jpg)
 
 En círculos y polígonos solo se tiene en cuenta lo que queda **dentro** de la
-forma. Si la región es más pequeña que un campo de la IA (unos 0,86 × 0,65 mm), el
-modelo ve también algo del tejido de alrededor.
+forma.
+
+En una región, la IA recorre el tejido en **muchas posiciones solapadas** (unas
+150, según el tamaño de la zona), de modo que si conviven varios tipos de tejido
+verás el porcentaje de cada uno. El dashboard indica cuántas posiciones se han
+analizado y la **probabilidad media** de cada clase. Como cada posición se
+clasifica con un campo completo de unos 0,86 × 0,65 mm centrado en ella, en
+regiones pequeñas el modelo ve también algo del tejido de alrededor, y el
+dashboard lo avisa. La clasificación de una región tarda algo más que la de un
+campo suelto (unos 15 s en CPU para 120 posiciones).
 
 ---
 
@@ -425,6 +463,9 @@ Reúne todas las acciones del visor en un buscador. Ábrela con **Ctrl + K** (en
 | La clasificación IA muestra un error del modelo no disponible | Faltan los pesos del modelo en el servidor. Avisa al administrador; el resto de la aplicación funciona con normalidad |
 | La aplicación te devuelve a la pantalla de inicio de sesión | La sesión ha caducado (24 h). Vuelve a iniciar sesión |
 | El primer análisis de una imagen tarda | Es normal: se calcula una vez y queda guardado. La IA tarda más en imágenes grandes, sobre todo en CPU |
+| La máscara de tejido deja fuera zonas pálidas o incluye cristal | Ajusta el **umbral de detección** del bloque «Máscara de tejido» ([sección 9](#9-análisis-del-tejido)) y pulsa «Aplicar» |
+| Al guardar una anotación aparece «Escribe un nombre o elige una clasificación» | Una anotación necesita al menos un nombre o una clase |
+| La IA marca como carcinoma invasivo zonas que parecen normales | Es una limitación conocida del modelo ([sección 10](#10-clasificación-con-inteligencia-artificial)). Contrasta siempre el resultado con la observación de la imagen |
 | El dashboard no muestra la densidad | Genera antes el mapa de densidad desde el panel lateral (o con «Re-analizar») |
 | Un análisis antiguo cambia al abrirlo | Si la aplicación se actualiza con un algoritmo o modelo nuevo, los resultados antiguos se recalculan solos |
 
@@ -435,10 +476,12 @@ Reúne todas las acciones del visor en un buscador. Ábrela con **Ctrl + K** (en
 - **WSI (Whole Slide Image):** digitalización completa de un portaobjetos, con
   decenas de miles de píxeles por lado.
 - **Anotación:** zona de la imagen marcada a mano (rectángulo, círculo o
-  polígono), con etiqueta y clase opcionales.
+  polígono), con un nombre y, opcionalmente, una clase.
 - **Clase:** categoría que asignas a tus anotaciones (p. ej. «Tumor»). Tú decides
   sus nombres y colores.
 - **Máscara de tejido:** capa que separa el tejido del cristal del portaobjetos.
+- **Umbral de detección:** sensibilidad con la que se decide qué es tejido; se
+  calcula solo para cada imagen y puedes ajustarlo.
 - **Densidad:** proporción de tejido dentro de una celda (0 = vacía, 1 = llena).
 - **Campo:** cada zona de unos 0,86 × 0,65 mm que analiza la IA.
 - **Opacidad:** transparencia de una capa sobre la imagen.

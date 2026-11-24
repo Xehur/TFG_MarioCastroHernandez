@@ -60,6 +60,9 @@ from app.services.wsi.openslide_service import OpenSlideService
 logger = logging.getLogger(__name__)
 
 AI_ANALYSIS_TYPE = "ai_classification"
+# Versión del muestreo y del overlay: al cambiarla se regeneran los resultados
+# cacheados (v2: ventana deslizante en anotaciones y borde sin atenuar).
+CLASSIFICATION_VERSION = "fields-v2"
 _THUMBNAIL_MAX_SIZE = 2048
 
 # MPP por defecto si la WSI no expone metadatos de magnificación.
@@ -151,8 +154,13 @@ def _finish(
     height: int,
     inferred: Optional[np.ndarray] = None,
     clip: Optional[np.ndarray] = None,
+    display: Optional[np.ndarray] = None,
 ) -> Dict[str, Any]:
-    """Compone recuentos, confianza, probabilidades medias y overlay."""
+    """Compone recuentos, confianza, probabilidades medias y overlay.
+
+    ``display`` (opcional) son las etiquetas que se pintan con intensidad
+    plena; por defecto, las clasificadas (``labels``).
+    """
     rows, cols = labels.shape
     analyzed = labels >= 0
     n = int(analyzed.sum())
@@ -173,7 +181,8 @@ def _finish(
             code: round(float(v), 4) for code, v in zip(CLASS_CODES, mean_probs)
         },
         "overlay": _labels_to_overlay(
-            labels, x_edges, y_edges, width, height, inferred=inferred, clip=clip
+            labels if display is None else display,
+            x_edges, y_edges, width, height, inferred=inferred, clip=clip,
         ),
     }
 
@@ -253,6 +262,20 @@ def field_size_level0(mpp: float) -> Tuple[int, int]:
     )
 
 
+def adaptive_cell_divisor(
+    region_w: int, region_h: int, field_w: int, field_h: int, target_cells: int
+) -> int:
+    """Divisor de celda para que la región tenga unas ``target_cells`` celdas.
+
+    Una región del tamaño de un campo se divide en ``AI_MAX_CELL_DIVISOR``² celdas
+    como mucho; una región que ya contiene muchos campos usa celdas del tamaño
+    del campo (divisor 1).
+    """
+    fields_in_region = (region_w * region_h) / float(max(1, field_w * field_h))
+    divisor = int(round(math.sqrt(target_cells / max(fields_in_region, 1e-6))))
+    return max(1, min(settings.AI_MAX_CELL_DIVISOR, divisor))
+
+
 def _spread_sample(n: int, k: int) -> np.ndarray:
     """``k`` índices de ``range(n)`` repartidos uniformemente (deterministas)."""
     if k >= n:
@@ -280,10 +303,20 @@ def classify_slide_region(
     *,
     max_patches: Optional[int] = None,
     min_tissue_frac: Optional[float] = None,
+    cell_divisor: int = 1,
+    target_cells: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Clasifica una región de la WSI leyendo campos REALES a la escala física de
     entrenamiento (~860x645 µm por defecto), en lugar de aplastar una miniatura.
+
+    Con ``cell_divisor`` > 1 la rejilla usa celdas ``cell_divisor`` veces más
+    pequeñas que el campo, y cada celda se clasifica con un campo completo
+    centrado en ella (ventana deslizante con solape). El modelo sigue viendo
+    su escala de entrenamiento, pero el resultado se localiza con más detalle:
+    así una región con varios tipos de tejido no recibe una única etiqueta.
+    Con ``target_cells`` el divisor se elige automáticamente según el tamaño
+    de la región (ver ``adaptive_cell_divisor``).
 
     La región se cubre con una rejilla densa (una celda = un campo). Solo se
     clasifican las celdas con tejido; si hay más que ``max_patches`` se elige un
@@ -321,11 +354,17 @@ def classify_slide_region(
     out_h = MODEL_INPUT_SIZE
     out_w = max(1, int(round(MODEL_INPUT_SIZE * field_w / field_h)))
 
-    # Rejilla densa: celdas del tamaño exacto del campo (la última, parcial).
-    cols = max(1, int(math.ceil(region_w / field_w)))
-    rows = max(1, int(math.ceil(region_h / field_h)))
-    x_edges0 = np.minimum(np.arange(cols + 1) * field_w, region_w)
-    y_edges0 = np.minimum(np.arange(rows + 1) * field_h, region_h)
+    # Rejilla densa: celdas del tamaño del campo, o una fracción de él con
+    # ``cell_divisor`` (la última de cada fila/columna, parcial).
+    if target_cells:
+        cell_divisor = adaptive_cell_divisor(region_w, region_h, field_w, field_h, target_cells)
+    cell_divisor = max(1, int(cell_divisor))
+    cell_w = max(1, field_w / cell_divisor)
+    cell_h = max(1, field_h / cell_divisor)
+    cols = max(1, int(math.ceil(region_w / cell_w)))
+    rows = max(1, int(math.ceil(region_h / cell_h)))
+    x_edges0 = np.minimum(np.arange(cols + 1) * cell_w, region_w).round().astype(int)
+    y_edges0 = np.minimum(np.arange(rows + 1) * cell_h, region_h).round().astype(int)
     tx_edges = (x_edges0 * thumb_w / region_w).round().astype(int)
     ty_edges = (y_edges0 * thumb_h / region_h).round().astype(int)
 
@@ -378,10 +417,16 @@ def classify_slide_region(
             patches = list(pool.map(_read, cells))
             _classify_into(patches, cells, labels, confid, prob_sum)
 
-    inferred = _nearest_fill(labels, (tissue_grid & (labels < 0)) | edge_grid)
+    # Relleno por vecindad: las celdas de borde (poco tejido) se pintan con la
+    # misma intensidad que su vecina, porque son la continuación del mismo
+    # tejido; solo las celdas de tejido que el muestreo dejó sin evaluar se
+    # atenúan, para que se distingan de las clasificadas por el modelo.
+    edge_fill = _nearest_fill(labels, edge_grid)
+    sample_fill = _nearest_fill(labels, tissue_grid & (labels < 0))
+    display = np.where(labels >= 0, labels, edge_fill)
     result = _finish(
         labels, confid, prob_sum, tx_edges, ty_edges, thumb_w, thumb_h,
-        inferred=inferred, clip=tissue_mask,
+        inferred=sample_fill, clip=tissue_mask, display=display,
     )
     n_tissue = len(tissue_cells)
     result.update(
@@ -389,9 +434,12 @@ def classify_slide_region(
             "mpp": round(float(mpp), 4),
             "mpp_source": "metadata" if slide_mpp else "default",
             "patch_px_level0": [field_w, field_h],
+            "cell_divisor": cell_divisor,
+            "cell_um": [round(cell_w * mpp, 1), round(cell_h * mpp, 1)],
             "field_um": [round(field_w * mpp, 1), round(field_h * mpp, 1)],
             "tissue_cells": n_tissue,
-            "inferred_cells": int((inferred >= 0).sum()),
+            "inferred_cells": int((edge_fill >= 0).sum() + (sample_fill >= 0).sum()),
+            "attenuated_cells": int((sample_fill >= 0).sum()),
             "coverage": round(len(selected) / n_tissue, 4) if n_tissue else 1.0,
             "sampled": len(selected) < n_tissue,
             "field_exceeds_region": field_w > region_w or field_h > region_h,
@@ -529,12 +577,24 @@ def _run_and_store(
     thumb_rgb: np.ndarray,
     png_path: str,
     extra: Optional[Dict[str, Any]] = None,
+    sliding: bool = False,
 ) -> AnalysisResult:
     """Clasifica la región (campos reales a escala de entrenamiento), guarda el
-    overlay PNG y persiste el AnalysisResult."""
+    overlay PNG y persiste el AnalysisResult. Con ``sliding`` (anotaciones) usa
+    la ventana deslizante con celdas más finas que el campo."""
     model_info = _model_info()  # carga el modelo: falla pronto si no hay pesos
-    tissue = detect_tissue(thumb_rgb)
-    result = classify_slide_region(slide, region_bbox, thumb_rgb, tissue.mask)
+    from app.services.analysis import tissue_service  # import diferido
+
+    factor = tissue_service.get_threshold_factor(db, image_id)
+    tissue = detect_tissue(thumb_rgb, threshold_factor=factor)
+    if sliding:
+        result = classify_slide_region(
+            slide, region_bbox, thumb_rgb, tissue.mask,
+            max_patches=settings.AI_ANNOTATION_MAX_PATCHES,
+            target_cells=settings.AI_ANNOTATION_TARGET_CELLS,
+        )
+    else:
+        result = classify_slide_region(slide, region_bbox, thumb_rgb, tissue.mask)
 
     PILImage.fromarray(result["overlay"], mode="RGBA").save(png_path, format="PNG")
 
@@ -549,6 +609,8 @@ def _run_and_store(
         "total_patches": result["total_patches"],
         "tissue_percent": round(tissue.tissue_percent, 4),
         "tissue_detector_version": DETECTOR_VERSION,
+        "classification_version": CLASSIFICATION_VERSION,
+        "tissue_threshold_factor": factor,
         "mean_confidence": round(result["mean_confidence"], 4),
         "mean_probabilities": result["mean_probabilities"],
         "mpp": result.get("mpp"),
@@ -562,7 +624,12 @@ def _run_and_store(
             "coverage": result.get("coverage"),
             "sampled": result.get("sampled"),
             "field_exceeds_region": result.get("field_exceeds_region"),
-            "max_patches": settings.AI_MAX_PATCHES,
+            "attenuated_cells": result.get("attenuated_cells"),
+            "cell_divisor": result.get("cell_divisor"),
+            "cell_um": result.get("cell_um"),
+            "max_patches": (
+                settings.AI_ANNOTATION_MAX_PATCHES if sliding else settings.AI_MAX_PATCHES
+            ),
             "min_tissue_frac": settings.AI_MIN_TISSUE_FRAC,
         },
         "legend": class_legend(),
@@ -608,9 +675,18 @@ def _get_cached(
     return query.order_by(AnalysisResult.created_at.desc()).first()
 
 
-def _usable_cache(analysis: Optional[AnalysisResult]) -> bool:
-    """El resultado cacheado existe, es del modelo actual y su PNG sigue en disco."""
+def _usable_cache(
+    analysis: Optional[AnalysisResult], threshold_factor: float = 1.0
+) -> bool:
+    """El resultado cacheado existe, es del modelo actual, se calculó con el
+    mismo factor de umbral de tejido y su PNG sigue en disco."""
     if analysis is None or not _is_current_model(analysis):
+        return False
+    data = analysis.result_data or {}
+    # Resultados con un muestreo/overlay anterior se regeneran al pedirlos.
+    if data.get("classification_version") != CLASSIFICATION_VERSION:
+        return False
+    if abs(float(data.get("tissue_threshold_factor", 1.0)) - threshold_factor) > 1e-6:
         return False
     map_path = (analysis.result_data or {}).get("map_path")
     return bool(map_path and os.path.exists(map_path))
@@ -653,8 +729,10 @@ def get_or_create_image_classification(
     db: Session, image_id: int, file_path: str, force: bool = False
 ) -> AnalysisResult:
     if not force:
+        from app.services.analysis import tissue_service  # import diferido
+
         cached = get_cached_image_classification(db, image_id)
-        if _usable_cache(cached):
+        if _usable_cache(cached, tissue_service.get_threshold_factor(db, image_id)):
             return cached
     return generate_image_classification(db, image_id, file_path)
 
@@ -699,6 +777,7 @@ def generate_annotation_classification(
             rgb,
             png_path,
             extra={"scale": scale, "bbox": list(used_bbox)},
+            sliding=True,
         )
     finally:
         slide.close()
@@ -708,7 +787,10 @@ def get_or_create_annotation_classification(
     db: Session, annotation: Annotation, file_path: str, force: bool = False
 ) -> AnalysisResult:
     if not force:
+        from app.services.analysis import tissue_service  # import diferido
+
         cached = get_cached_annotation_classification(db, annotation.id)
-        if _usable_cache(cached):
+        factor = tissue_service.get_threshold_factor(db, annotation.image_id)
+        if _usable_cache(cached, factor):
             return cached
     return generate_annotation_classification(db, annotation, file_path)

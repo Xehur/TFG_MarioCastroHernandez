@@ -301,3 +301,63 @@ def test_tejido_que_absorbe_en_un_solo_canal():
     img[60:140, 140:240] = [242, 224, 240]  # saturación ≈ 0.074 < 0.08
     mask = tissue_detection.detect_tissue(img).mask
     assert mask[100, 200]
+
+
+# --- Factor de umbral ajustable por el usuario ---------------------------------
+
+def test_factor_de_umbral_mas_alto_detecta_menos_tejido():
+    rgb = _slide_with_pale_tissue()
+    auto = tissue_detection.detect_tissue(rgb)
+    strict = tissue_detection.detect_tissue(rgb, threshold_factor=3.0)
+    assert auto.extra["threshold_factor"] == 1.0
+    assert strict.extra["threshold_factor"] == 3.0
+    # Con un umbral más exigente el tejido pálido deja de considerarse tejido,
+    # pero el bien teñido se mantiene.
+    assert auto.mask[100, 190] and not strict.mask[100, 190]
+    assert strict.mask[100, 90]
+    assert strict.tissue_percent < auto.tissue_percent
+
+
+def test_factor_de_umbral_se_limita_al_rango():
+    assert tissue_detection.clamp_threshold_factor(None) == 1.0
+    assert tissue_detection.clamp_threshold_factor(0.01) == tissue_detection.MIN_THRESHOLD_FACTOR
+    assert tissue_detection.clamp_threshold_factor(99) == tissue_detection.MAX_THRESHOLD_FACTOR
+
+
+def test_cache_distingue_el_factor_de_umbral():
+    data = {"detector_version": tissue_detection.DETECTOR_VERSION}
+    assert tissue_detection.is_current_detector(data)  # sin factor = 1.0
+    assert not tissue_detection.is_current_detector(data, 1.5)
+    data["threshold_factor"] = 1.5
+    assert tissue_detection.is_current_detector(data, 1.5)
+
+
+def test_vista_previa_no_guarda_y_devuelve_porcentaje(client):
+    image_id, _ = _make_image_with_file(filename="tissue_preview.svs")
+    resp = client.get(f"/images/{image_id}/tissue-mask/preview?threshold_factor=1.5")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "image/png"
+    assert float(resp.headers["x-tissue-percent"]) > 0
+    assert resp.headers["x-threshold-factor"] == "1.500"
+    # No se ha persistido: la máscara guardada sigue con el factor automático.
+    stats = client.get(f"/images/{image_id}/tissue-mask/stats").json()["result_data"]
+    assert stats["threshold_factor"] == 1.0
+
+
+def test_vista_previa_rechaza_factor_fuera_de_rango(client):
+    image_id, _ = _make_image_with_file(filename="tissue_preview_bad.svs")
+    assert client.get(
+        f"/images/{image_id}/tissue-mask/preview?threshold_factor=10"
+    ).status_code == 422
+
+
+def test_aplicar_factor_lo_guarda_para_la_imagen(client):
+    image_id, _ = _make_image_with_file(filename="tissue_apply.svs")
+    resp = client.post(f"/images/{image_id}/analyze/tissue?threshold_factor=2")
+    assert resp.status_code == 201
+    assert resp.json()["result_data"]["threshold_factor"] == 2.0
+    # Se conserva al pedir de nuevo la máscara y al re-analizar sin factor.
+    stats = client.get(f"/images/{image_id}/tissue-mask/stats").json()["result_data"]
+    assert stats["threshold_factor"] == 2.0
+    again = client.post(f"/images/{image_id}/analyze/tissue").json()["result_data"]
+    assert again["threshold_factor"] == 2.0

@@ -24,9 +24,32 @@ export const tissueService = {
     return URL.createObjectURL(response.data);
   },
 
-  /** Fuerza el (re)análisis de tejido. */
-  analyze: async imageId => {
-    const response = await apiClient.post(`/images/${imageId}/analyze/tissue`);
+  /**
+   * Vista previa de la máscara con un factor de umbral (no se guarda).
+   * Devuelve { url, tissuePercent } con una object URL del PNG.
+   */
+  getPreview: async (imageId, thresholdFactor) => {
+    const response = await apiClient.get(`/images/${imageId}/tissue-mask/preview`, {
+      params: { threshold_factor: thresholdFactor },
+      responseType: 'blob',
+    });
+    const percent = Number(response.headers?.['x-tissue-percent']);
+    return {
+      url: URL.createObjectURL(response.data),
+      tissuePercent: Number.isFinite(percent) ? percent : null,
+    };
+  },
+
+  /**
+   * Fuerza el (re)análisis de tejido. Con `thresholdFactor` aplica y guarda
+   * ese factor de umbral para la imagen; sin él conserva el actual.
+   */
+  analyze: async (imageId, { thresholdFactor } = {}) => {
+    const url = `/images/${imageId}/analyze/tissue`;
+    const response =
+      thresholdFactor != null
+        ? await apiClient.post(url, null, { params: { threshold_factor: thresholdFactor } })
+        : await apiClient.post(url);
     return response.data;
   },
 };

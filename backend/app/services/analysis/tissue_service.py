@@ -8,6 +8,8 @@ cacheado del PNG de la máscara en disco y de las métricas en BD
 import io
 import os
 import logging
+import threading
+from collections import OrderedDict
 from typing import Optional, Tuple
 
 import numpy as np
@@ -18,6 +20,8 @@ from app.config import settings
 from app.models.analysis import AnalysisResult
 from app.services.wsi.openslide_service import OpenSlideService
 from app.services.analysis.tissue_detection import (
+    DEFAULT_THRESHOLD_FACTOR,
+    clamp_threshold_factor,
     detect_tissue,
     is_current_detector,
     mask_to_rgba_overlay,
@@ -27,6 +31,12 @@ logger = logging.getLogger(__name__)
 
 TISSUE_ANALYSIS_TYPE = "tissue_mask"
 _THUMBNAIL_MAX_SIZE = 2048
+# La vista previa del umbral usa una miniatura menor para responder en ~0,2 s.
+PREVIEW_MAX_SIZE = 1024
+_PREVIEW_CACHE_SIZE = 4
+
+_preview_thumbs: "OrderedDict[Tuple[str, float, int], Tuple[np.ndarray, float]]" = OrderedDict()
+_preview_lock = threading.Lock()
 
 
 def _analysis_dir(image_id: int) -> str:
@@ -62,6 +72,50 @@ def get_cached_result(db: Session, image_id: int) -> Optional[AnalysisResult]:
     )
 
 
+def get_threshold_factor(db: Session, image_id: int) -> float:
+    """Factor de umbral de tejido elegido por el usuario para una imagen (1.0
+    si no lo ha cambiado). Se guarda con la máscara de tejido de la imagen y lo
+    usan también la densidad y la clasificación IA, para que todos los análisis
+    trabajen sobre el mismo tejido."""
+    cached = get_cached_result(db, image_id)
+    data = (cached.result_data or {}) if cached is not None else {}
+    return clamp_threshold_factor(data.get("threshold_factor", DEFAULT_THRESHOLD_FACTOR))
+
+
+def _preview_thumbnail(file_path: str, max_size: int) -> Tuple[np.ndarray, float]:
+    """Miniatura para la vista previa, cacheada en memoria (pocas entradas)
+    para que mover el deslizador no relea la WSI en cada petición."""
+    try:
+        mtime = os.path.getmtime(file_path)
+    except OSError:
+        mtime = 0.0
+    key = (os.path.abspath(file_path), mtime, max_size)
+    with _preview_lock:
+        if key in _preview_thumbs:
+            _preview_thumbs.move_to_end(key)
+            return _preview_thumbs[key]
+    value = load_thumbnail_rgb(file_path, max_size=max_size)
+    with _preview_lock:
+        _preview_thumbs[key] = value
+        while len(_preview_thumbs) > _PREVIEW_CACHE_SIZE:
+            _preview_thumbs.popitem(last=False)
+    return value
+
+
+def preview_tissue_mask(
+    file_path: str, threshold_factor: float, max_size: int = PREVIEW_MAX_SIZE
+) -> Tuple[bytes, dict]:
+    """Calcula la máscara con un factor de umbral SIN guardarla (vista previa
+    del deslizador). Devuelve el PNG del overlay y sus métricas."""
+    rgb, scale = _preview_thumbnail(file_path, max_size)
+    result = detect_tissue(rgb, threshold_factor=threshold_factor)
+    buffer = io.BytesIO()
+    PILImage.fromarray(mask_to_rgba_overlay(result.mask), mode="RGBA").save(
+        buffer, format="PNG"
+    )
+    return buffer.getvalue(), {**result.stats(), "scale": scale, "preview": True}
+
+
 def generate_tissue_mask(
     db: Session,
     image_id: int,
@@ -71,6 +125,7 @@ def generate_tissue_mask(
     rgb=None,
     scale: Optional[float] = None,
     tissue=None,
+    threshold_factor: Optional[float] = None,
 ) -> AnalysisResult:
     """
     Ejecuta la detección de tejido, guarda el PNG de overlay en disco y
@@ -78,8 +133,13 @@ def generate_tissue_mask(
 
     ``rgb``/``scale``/``tissue`` opcionales permiten reutilizar una miniatura y
     una detección ya calculadas (p.ej. en el análisis consolidado), evitando
-    releer la imagen y recomputar la detección.
+    releer la imagen y recomputar la detección. ``threshold_factor`` fija el
+    factor de umbral; si se omite se conserva el que ya tenía la imagen.
     """
+    if threshold_factor is None:
+        threshold_factor = get_threshold_factor(db, image_id)
+    threshold_factor = clamp_threshold_factor(threshold_factor)
+
     if rgb is None or scale is None:
         slide = OpenSlideService(file_path)
         try:
@@ -87,7 +147,10 @@ def generate_tissue_mask(
         finally:
             slide.close()
 
-    result = tissue if tissue is not None else detect_tissue(rgb)
+    result = (
+        tissue if tissue is not None
+        else detect_tissue(rgb, threshold_factor=threshold_factor)
+    )
 
     overlay = mask_to_rgba_overlay(result.mask)
     png_path = _mask_png_path(image_id)
@@ -134,7 +197,12 @@ def get_or_create_tissue_mask(
             mask_path = data.get("mask_path")
             # Regenera máscaras generadas por el antiguo detector de IA
             # (detector_mode != "classical" o ausente) para auto-curarlas.
-            mode_ok = data.get("detector_mode") == "classical" and is_current_detector(data)
+            factor = clamp_threshold_factor(
+                data.get("threshold_factor", DEFAULT_THRESHOLD_FACTOR)
+            )
+            mode_ok = data.get("detector_mode") == "classical" and is_current_detector(
+                data, factor
+            )
             if mask_path and os.path.exists(mask_path) and mode_ok:
                 return cached
     return generate_tissue_mask(db, image_id, file_path)

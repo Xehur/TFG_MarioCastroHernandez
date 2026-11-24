@@ -42,6 +42,7 @@ from app.services.analysis.density_generation import (
     DEFAULT_COLORMAP,
 )
 from app.services.analysis import analytics_service
+from app.services.analysis import tissue_service
 
 logger = logging.getLogger(__name__)
 
@@ -194,7 +195,11 @@ def generate_tissue_mask(
     if rgb is None or scale is None or used_bbox is None:
         rgb, scale, used_bbox = _load_region_rgb(annotation, file_path)
 
-    result = tissue if tissue is not None else detect_tissue(rgb)
+    factor = tissue_service.get_threshold_factor(db, annotation.image_id)
+    result = (
+        tissue if tissue is not None
+        else detect_tissue(rgb, threshold_factor=factor)
+    )
 
     overlay = mask_to_rgba_overlay(result.mask)
     png_path = _mask_png_path(annotation.image_id, annotation.id)
@@ -235,7 +240,10 @@ def get_or_create_tissue_mask(
             if (
                 mask_path
                 and os.path.exists(mask_path)
-                and is_current_detector(cached.result_data)
+                and is_current_detector(
+                    cached.result_data,
+                    tissue_service.get_threshold_factor(db, annotation.image_id),
+                )
             ):
                 return cached
     return generate_tissue_mask(db, annotation, file_path)
@@ -294,7 +302,11 @@ def generate_density(
     if rgb is None or scale is None or used_bbox is None:
         rgb, scale, used_bbox = _load_region_rgb(annotation, file_path)
 
-    tissue = tissue if tissue is not None else detect_tissue(rgb)
+    factor = tissue_service.get_threshold_factor(db, annotation.image_id)
+    tissue = (
+        tissue if tissue is not None
+        else detect_tissue(rgb, threshold_factor=factor)
+    )
     _, _, region_w, region_h = used_bbox
 
     result = generate_density_map(
@@ -322,6 +334,7 @@ def generate_density(
     data["bbox"] = list(used_bbox)
     data["tissue_percent"] = round(tissue.tissue_percent, 4)
     data["detector_version"] = DETECTOR_VERSION
+    data["threshold_factor"] = tissue.extra.get("threshold_factor", factor)
     data["colorbar"] = _colormap_lut(colormap, samples=16)
 
     existing = _exact_cached_density(db, annotation.id, grid_size, colormap)
@@ -358,7 +371,10 @@ def get_or_create_density(
             if (
                 map_path
                 and os.path.exists(map_path)
-                and is_current_detector(cached.density_data)
+                and is_current_detector(
+                    cached.density_data,
+                    tissue_service.get_threshold_factor(db, annotation.image_id),
+                )
             ):
                 return cached
     return generate_density(db, annotation, file_path, grid_size, colormap)
@@ -398,7 +414,10 @@ def run_full_analysis(
     sola lectura de la región y una sola detección de tejido.
     """
     rgb, scale, used_bbox = _load_region_rgb(annotation, file_path)
-    tissue_detection = detect_tissue(rgb)
+    tissue_detection = detect_tissue(
+        rgb,
+        threshold_factor=tissue_service.get_threshold_factor(db, annotation.image_id),
+    )
 
     tissue = generate_tissue_mask(
         db, annotation, file_path,

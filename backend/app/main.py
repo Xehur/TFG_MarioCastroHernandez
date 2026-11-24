@@ -52,6 +52,8 @@ app.add_middleware(
     allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
     allow_methods=settings.CORS_ALLOW_METHODS,
     allow_headers=settings.CORS_ALLOW_HEADERS,
+    # Métricas de la vista previa del umbral de tejido, leídas por el frontend.
+    expose_headers=["X-Tissue-Percent", "X-Threshold-Factor"],
 )
 
 # Middleware personalizado

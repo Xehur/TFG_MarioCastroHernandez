@@ -448,6 +448,77 @@ def test_overlay_cubre_todo_el_tejido_y_nada_del_cristal():
     assert result["inferred_cells"] > 0  # celdas de borde rellenadas
 
 
+def test_borde_del_tejido_con_la_misma_intensidad_que_su_clase():
+    """Las celdas de borde (poco tejido, rellenadas por vecindad) se pintan con
+    la misma opacidad que las clasificadas: el contorno no sale más claro."""
+    rgb = np.full((300, 400, 3), 235, dtype=np.uint8)
+    mask = np.zeros((300, 400), dtype=bool)
+    yy, xx = np.ogrid[:300, :400]
+    mask[(yy - 150) ** 2 / 90 ** 2 + (xx - 200) ** 2 / 150 ** 2 <= 1] = True
+    result = ai.classify_slide_region(
+        _FakeSlide("x"), (0, 0, 40000, 30000), rgb, mask, max_patches=5000
+    )
+    assert result["inferred_cells"] > 0 and result["attenuated_cells"] == 0
+    alphas = set(np.unique(result["overlay"][..., 3]).tolist())
+    assert alphas == {0, 140}
+
+
+class _HalfClassifier(_FakeClassifier):
+    """Benigno si el campo es azulado, invasivo si es rojizo."""
+
+    def predict_batch(self, images, batch_size=16):
+        probs = np.full((len(images), 4), 0.02, dtype=np.float32)
+        for i, img in enumerate(images):
+            arr = np.asarray(img, dtype=float)
+            probs[i, 0 if arr[..., 2].mean() > arr[..., 0].mean() else 2] = 0.94
+        return probs
+
+
+class _HalfSlide(_FakeSlide):
+    """WSI cuya mitad izquierda (x < 2000) es de un tejido y la derecha de otro."""
+
+    def read_field_rgb(self, cx, cy, w0, h0, out_w, out_h):
+        _FakeSlide.centers.append((cx, cy))
+        color = (60, 60, 200) if cx < 2000 else (200, 40, 60)
+        return np.full((out_h, out_w, 3), color, dtype=np.uint8)
+
+
+def test_divisor_adaptativo_segun_tamano_de_region():
+    # Región del tamaño de un campo: se divide al máximo.
+    assert ai.adaptive_cell_divisor(1720, 1290, 1720, 1290, 150) == settings.AI_MAX_CELL_DIVISOR
+    # Región con cientos de campos: celdas del tamaño del campo.
+    assert ai.adaptive_cell_divisor(40000, 30000, 1720, 1290, 150) == 1
+
+
+def test_ventana_deslizante_separa_dos_tejidos_en_una_region(monkeypatch):
+    """Una región de ~2 campos con dos tejidos: sin ventana deslizante recibe
+    1–2 etiquetas; con ella se reparten ambas clases en proporción."""
+    monkeypatch.setattr(ai, "get_classifier", lambda: _HalfClassifier())
+    rgb = np.full((120, 160, 3), (150, 40, 80), dtype=np.uint8)
+    mask = np.ones((120, 160), dtype=bool)
+    bbox = (0, 0, 4000, 1290)  # ~2,3 campos de ancho; tejido A en x<2000
+
+    coarse = ai.classify_slide_region(_HalfSlide("x"), bbox, rgb, mask)
+    assert coarse["tissue_patches"] <= 3
+
+    fine = ai.classify_slide_region(_HalfSlide("x"), bbox, rgb, mask, target_cells=150)
+    assert fine["cell_divisor"] > 1
+    assert fine["tissue_patches"] > 3 * coarse["tissue_patches"]
+    # Cada campo sigue teniendo el tamaño físico de entrenamiento.
+    assert fine["patch_px_level0"] == coarse["patch_px_level0"]
+    benign, invasive = fine["counts"]["BENIGN"], fine["counts"]["INVASIVE"]
+    assert benign > 0 and invasive > 0
+    assert abs(benign / (benign + invasive) - 0.5) < 0.15
+
+
+def test_anotacion_usa_ventana_deslizante(client):
+    image_id, _ = _make_image_with_file("ai_ann_sliding.svs")
+    ann_id = _create_annotation(client, image_id, _RECT)
+    rd = client.get(f"/annotations/{ann_id}/ai-classification/stats").json()["result_data"]
+    assert rd["sampling"]["cell_divisor"] > 1
+    assert rd["classification_version"] == ai.CLASSIFICATION_VERSION
+
+
 def test_campo_se_centra_en_el_tejido_de_la_celda():
     rgb = np.full((300, 400, 3), 235, dtype=np.uint8)
     mask = np.zeros((300, 400), dtype=bool)

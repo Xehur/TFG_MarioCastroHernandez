@@ -81,7 +81,9 @@ def run_full_analysis(
     rgb, scale = tissue_service.load_thumbnail_rgb(
         file_path, max_size=_THUMBNAIL_MAX_SIZE
     )
-    tissue_detection = detect_tissue(rgb)
+    tissue_detection = detect_tissue(
+        rgb, threshold_factor=tissue_service.get_threshold_factor(db, image_id)
+    )
 
     tissue = tissue_service.generate_tissue_mask(
         db, image_id, file_path, rgb=rgb, scale=scale, tissue=tissue_detection

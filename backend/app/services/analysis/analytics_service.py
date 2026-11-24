@@ -330,6 +330,7 @@ def ai_summary(
     data = analysis.result_data or {}
     analyzed = data.get("tissue_patches") or 0
     out_classes = []
+    mean_probs = data.get("mean_probabilities") or {}
     for c in data.get("classes") or []:
         area = (
             round(tissue_area_mm2 * c.get("percent", 0) / 100.0, 3)
@@ -344,6 +345,7 @@ def ai_summary(
                 "count": c.get("count", 0),
                 "percent": c.get("percent", 0.0),
                 "area_mm2": area,
+                "mean_probability": mean_probs.get(c.get("code")),
             }
         )
     dominant = next(
@@ -363,6 +365,9 @@ def ai_summary(
         "classes": out_classes,
         "model": (data.get("model") or {}).get("dataset"),
         "field_um": sampling.get("field_um"),
+        "cell_divisor": sampling.get("cell_divisor") or 1,
+        "cell_um": sampling.get("cell_um"),
+        "field_exceeds_region": bool(sampling.get("field_exceeds_region")),
         "disclaimer": data.get("disclaimer"),
     }
 

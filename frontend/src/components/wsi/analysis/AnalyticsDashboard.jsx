@@ -58,6 +58,12 @@ export const formatArea = mm2 => {
   return `${nf(mm2, mm2 < 10 ? 2 : 1)} mm²`;
 };
 
+/** [ancho, alto] en µm -> "860×645 µm" (o "—"). */
+const formatMicrons = dims =>
+  Array.isArray(dims) && dims.length === 2
+    ? `${dims.map(v => Math.round(v)).join('×')} µm`
+    : '—';
+
 const formatPercent = (value, digits = 1) =>
   value == null ? '—' : `${nf(value, digits)} %`;
 
@@ -381,14 +387,22 @@ const AnalyticsDashboard = ({ imageId, annotationId, onClose }) => {
                   <>
                     <p className="analytics-caption">
                       Proporción de cada tipo de tejido en las zonas analizadas
-                      ({ai.analyzed_fields} de {ai.tissue_fields} campos con
-                      tejido
-                      {ai.field_um
-                        ? `, de ≈ ${ai.field_um
-                            .map(v => Math.round(v))
-                            .join('×')} µm`
-                        : ''}
-                      ). Confianza media del modelo:{' '}
+                      {ai.cell_divisor > 1 ? (
+                        <>
+                          {' '}
+                          ({ai.analyzed_fields} posiciones analizadas: campos de
+                          ≈ {formatMicrons(ai.field_um)} desplazados cada ≈{' '}
+                          {formatMicrons(ai.cell_um)})
+                        </>
+                      ) : (
+                        <>
+                          {' '}
+                          ({ai.analyzed_fields} de {ai.tissue_fields} campos con
+                          tejido
+                          {ai.field_um ? `, de ≈ ${formatMicrons(ai.field_um)}` : ''})
+                        </>
+                      )}
+                      . Confianza media del modelo:{' '}
                       <strong>
                         {ai.mean_confidence != null
                           ? formatPercent(ai.mean_confidence * 100, 0)
@@ -430,6 +444,9 @@ const AnalyticsDashboard = ({ imageId, annotationId, onClose }) => {
                         <tr>
                           <th>Clase</th>
                           <th>Proporción</th>
+                          <th title="Media de la probabilidad que el modelo asigna a cada clase en los campos analizados: refleja también el tejido mezclado dentro de cada campo">
+                            Prob. media
+                          </th>
                           <th>Superficie aprox.</th>
                         </tr>
                       </thead>
@@ -446,11 +463,23 @@ const AnalyticsDashboard = ({ imageId, annotationId, onClose }) => {
                               {c.name}
                             </td>
                             <td>{formatPercent(c.percent)}</td>
+                            <td>
+                              {c.mean_probability != null
+                                ? formatPercent(c.mean_probability * 100)
+                                : '—'}
+                            </td>
                             <td>{formatArea(c.area_mm2)}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
+                    {ai.field_exceeds_region && (
+                      <p className="analytics-caption">
+                        La zona es más pequeña que el campo con el que se
+                        entrenó el modelo ({formatMicrons(ai.field_um)}): cada
+                        clasificación incluye también tejido de su entorno.
+                      </p>
+                    )}
                     {ai.disclaimer && (
                       <p className="analytics-caption analytics-disclaimer">
                         {ai.disclaimer}

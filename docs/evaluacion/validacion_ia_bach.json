@@ -1,0 +1,2267 @@
+{
+  "fecha": "2026-11-24",
+  "wsi": [
+    "A03",
+    "A07",
+    "A05",
+    "A09",
+    "A10",
+    "A06"
+  ],
+  "modelo": {
+    "id": "inceptionv3-bach-he",
+    "arch": "inception_v3",
+    "dataset": "BACH (ICIAR 2018) Photos",
+    "classes": [
+      "benign",
+      "insitu",
+      "invasive",
+      "normal"
+    ],
+    "input_size": 299,
+    "preprocessing_version": "bach-v1",
+    "weights_sha256": "42515436dd2de4057eba0846aaac2561b38dc88efe960ef6a471807536394a5e",
+    "device": "cpu",
+    "gpu_name": null
+  },
+  "parametros": {
+    "normal_por_wsi": 10,
+    "semilla": 42,
+    "objetivo_celdas": 150,
+    "max_campos": 300
+  },
+  "segundos": 866.0144243240356,
+  "evaluaciones": {
+    "anotadas": {
+      "region": {
+        "matriz": {
+          "NORMAL": {
+            "NORMAL": 0,
+            "BENIGN": 0,
+            "INSITU": 0,
+            "INVASIVE": 0
+          },
+          "BENIGN": {
+            "NORMAL": 1,
+            "BENIGN": 12,
+            "INSITU": 5,
+            "INVASIVE": 4
+          },
+          "INSITU": {
+            "NORMAL": 0,
+            "BENIGN": 1,
+            "INSITU": 7,
+            "INVASIVE": 0
+          },
+          "INVASIVE": {
+            "NORMAL": 1,
+            "BENIGN": 1,
+            "INSITU": 1,
+            "INVASIVE": 10
+          }
+        },
+        "metricas": {
+          "n": 43,
+          "exactitud": 0.6744186046511628,
+          "exactitud_equilibrada": 0.7298951048951049,
+          "por_clase": {
+            "NORMAL": {
+              "precision": 0.0,
+              "recall": null,
+              "f1": null,
+              "soporte": 0
+            },
+            "BENIGN": {
+              "precision": 0.8571428571428571,
+              "recall": 0.5454545454545454,
+              "f1": 0.6666666666666665,
+              "soporte": 22
+            },
+            "INSITU": {
+              "precision": 0.5384615384615384,
+              "recall": 0.875,
+              "f1": 0.6666666666666667,
+              "soporte": 8
+            },
+            "INVASIVE": {
+              "precision": 0.7142857142857143,
+              "recall": 0.7692307692307693,
+              "f1": 0.7407407407407408,
+              "soporte": 13
+            }
+          },
+          "carcinoma_vs_resto": {
+            "sensibilidad": 0.8571428571428571,
+            "especificidad": 0.5909090909090909,
+            "tp": 18,
+            "fn": 3,
+            "fp": 9,
+            "tn": 13
+          }
+        }
+      },
+      "campo": {
+        "matriz": {
+          "NORMAL": {
+            "NORMAL": 0,
+            "BENIGN": 0,
+            "INSITU": 0,
+            "INVASIVE": 0
+          },
+          "BENIGN": {
+            "NORMAL": 152,
+            "BENIGN": 523,
+            "INSITU": 178,
+            "INVASIVE": 208
+          },
+          "INSITU": {
+            "NORMAL": 13,
+            "BENIGN": 85,
+            "INSITU": 381,
+            "INVASIVE": 19
+          },
+          "INVASIVE": {
+            "NORMAL": 34,
+            "BENIGN": 98,
+            "INSITU": 110,
+            "INVASIVE": 1059
+          }
+        },
+        "metricas": {
+          "n": 2860,
+          "exactitud": 0.6863636363636364,
+          "exactitud_equilibrada": 0.6906602256649066,
+          "por_clase": {
+            "NORMAL": {
+              "precision": 0.0,
+              "recall": null,
+              "f1": null,
+              "soporte": 0
+            },
+            "BENIGN": {
+              "precision": 0.7407932011331445,
+              "recall": 0.49293119698397736,
+              "f1": 0.5919637804187888,
+              "soporte": 1061
+            },
+            "INSITU": {
+              "precision": 0.5695067264573991,
+              "recall": 0.7650602409638554,
+              "f1": 0.6529562982005142,
+              "soporte": 498
+            },
+            "INVASIVE": {
+              "precision": 0.8234836702954899,
+              "recall": 0.813989239046887,
+              "f1": 0.8187089292616931,
+              "soporte": 1301
+            }
+          },
+          "carcinoma_vs_resto": {
+            "sensibilidad": 0.8721511951083936,
+            "especificidad": 0.6361922714420358,
+            "tp": 1569,
+            "fn": 230,
+            "fp": 386,
+            "tn": 675
+          }
+        }
+      }
+    },
+    "todas": {
+      "region": {
+        "matriz": {
+          "NORMAL": {
+            "NORMAL": 24,
+            "BENIGN": 7,
+            "INSITU": 1,
+            "INVASIVE": 28
+          },
+          "BENIGN": {
+            "NORMAL": 1,
+            "BENIGN": 12,
+            "INSITU": 5,
+            "INVASIVE": 4
+          },
+          "INSITU": {
+            "NORMAL": 0,
+            "BENIGN": 1,
+            "INSITU": 7,
+            "INVASIVE": 0
+          },
+          "INVASIVE": {
+            "NORMAL": 1,
+            "BENIGN": 1,
+            "INSITU": 1,
+            "INVASIVE": 10
+          }
+        },
+        "metricas": {
+          "n": 103,
+          "exactitud": 0.5145631067961165,
+          "exactitud_equilibrada": 0.6474213286713286,
+          "por_clase": {
+            "NORMAL": {
+              "precision": 0.9230769230769231,
+              "recall": 0.4,
+              "f1": 0.5581395348837209,
+              "soporte": 60
+            },
+            "BENIGN": {
+              "precision": 0.5714285714285714,
+              "recall": 0.5454545454545454,
+              "f1": 0.5581395348837208,
+              "soporte": 22
+            },
+            "INSITU": {
+              "precision": 0.5,
+              "recall": 0.875,
+              "f1": 0.6363636363636364,
+              "soporte": 8
+            },
+            "INVASIVE": {
+              "precision": 0.23809523809523808,
+              "recall": 0.7692307692307693,
+              "f1": 0.36363636363636365,
+              "soporte": 13
+            }
+          },
+          "carcinoma_vs_resto": {
+            "sensibilidad": 0.8571428571428571,
+            "especificidad": 0.5365853658536586,
+            "tp": 18,
+            "fn": 3,
+            "fp": 38,
+            "tn": 44
+          }
+        }
+      },
+      "campo": {
+        "matriz": {
+          "NORMAL": {
+            "NORMAL": 1854,
+            "BENIGN": 1088,
+            "INSITU": 241,
+            "INVASIVE": 2556
+          },
+          "BENIGN": {
+            "NORMAL": 152,
+            "BENIGN": 523,
+            "INSITU": 178,
+            "INVASIVE": 208
+          },
+          "INSITU": {
+            "NORMAL": 13,
+            "BENIGN": 85,
+            "INSITU": 381,
+            "INVASIVE": 19
+          },
+          "INVASIVE": {
+            "NORMAL": 34,
+            "BENIGN": 98,
+            "INSITU": 110,
+            "INVASIVE": 1059
+          }
+        },
+        "metricas": {
+          "n": 8599,
+          "exactitud": 0.44388882428189325,
+          "exactitud_equilibrada": 0.5987583684122972,
+          "por_clase": {
+            "NORMAL": {
+              "precision": 0.9030686799805163,
+              "recall": 0.3230527966544694,
+              "f1": 0.4758726899383984,
+              "soporte": 5739
+            },
+            "BENIGN": {
+              "precision": 0.2915273132664437,
+              "recall": 0.49293119698397736,
+              "f1": 0.3663747810858144,
+              "soporte": 1061
+            },
+            "INSITU": {
+              "precision": 0.4186813186813187,
+              "recall": 0.7650602409638554,
+              "f1": 0.5411931818181818,
+              "soporte": 498
+            },
+            "INVASIVE": {
+              "precision": 0.2756376887038001,
+              "recall": 0.813989239046887,
+              "f1": 0.41182189383628237,
+              "soporte": 1301
+            }
+          },
+          "carcinoma_vs_resto": {
+            "sensibilidad": 0.8721511951083936,
+            "especificidad": 0.5319117647058823,
+            "tp": 1569,
+            "fn": 230,
+            "fp": 3183,
+            "tn": 3617
+          }
+        }
+      }
+    }
+  },
+  "detalle": [
+    {
+      "wsi": "A03",
+      "tipo": "anotada",
+      "real": "INSITU",
+      "predicha": "INSITU",
+      "recuentos": {
+        "BENIGN": 5,
+        "INSITU": 62,
+        "INVASIVE": 0,
+        "NORMAL": 0
+      },
+      "posiciones": 67,
+      "prob_media": {
+        "BENIGN": 0.0869,
+        "INSITU": 0.8887,
+        "INVASIVE": 0.0073,
+        "NORMAL": 0.0171
+      }
+    },
+    {
+      "wsi": "A03",
+      "tipo": "anotada",
+      "real": "INSITU",
+      "predicha": "INSITU",
+      "recuentos": {
+        "BENIGN": 4,
+        "INSITU": 5,
+        "INVASIVE": 0,
+        "NORMAL": 0
+      },
+      "posiciones": 9,
+      "prob_media": {
+        "BENIGN": 0.3694,
+        "INSITU": 0.5989,
+        "INVASIVE": 0.0176,
+        "NORMAL": 0.0142
+      }
+    },
+    {
+      "wsi": "A03",
+      "tipo": "anotada",
+      "real": "INSITU",
+      "predicha": "INSITU",
+      "recuentos": {
+        "BENIGN": 25,
+        "INSITU": 63,
+        "INVASIVE": 0,
+        "NORMAL": 0
+      },
+      "posiciones": 88,
+      "prob_media": {
+        "BENIGN": 0.3149,
+        "INSITU": 0.6553,
+        "INVASIVE": 0.0211,
+        "NORMAL": 0.0087
+      }
+    },
+    {
+      "wsi": "A03",
+      "tipo": "anotada",
+      "real": "INSITU",
+      "predicha": "INSITU",
+      "recuentos": {
+        "BENIGN": 2,
+        "INSITU": 24,
+        "INVASIVE": 0,
+        "NORMAL": 0
+      },
+      "posiciones": 26,
+      "prob_media": {
+        "BENIGN": 0.1603,
+        "INSITU": 0.821,
+        "INVASIVE": 0.003,
+        "NORMAL": 0.0156
+      }
+    },
+    {
+      "wsi": "A03",
+      "tipo": "anotada",
+      "real": "INSITU",
+      "predicha": "INSITU",
+      "recuentos": {
+        "BENIGN": 0,
+        "INSITU": 42,
+        "INVASIVE": 2,
+        "NORMAL": 0
+      },
+      "posiciones": 44,
+      "prob_media": {
+        "BENIGN": 0.0363,
+        "INSITU": 0.9193,
+        "INVASIVE": 0.0348,
+        "NORMAL": 0.0096
+      }
+    },
+    {
+      "wsi": "A03",
+      "tipo": "anotada",
+      "real": "INSITU",
+      "predicha": "INSITU",
+      "recuentos": {
+        "BENIGN": 9,
+        "INSITU": 91,
+        "INVASIVE": 6,
+        "NORMAL": 5
+      },
+      "posiciones": 111,
+      "prob_media": {
+        "BENIGN": 0.1183,
+        "INSITU": 0.7682,
+        "INVASIVE": 0.048,
+        "NORMAL": 0.0655
+      }
+    },
+    {
+      "wsi": "A03",
+      "tipo": "anotada",
+      "real": "INSITU",
+      "predicha": "BENIGN",
+      "recuentos": {
+        "BENIGN": 18,
+        "INSITU": 12,
+        "INVASIVE": 1,
+        "NORMAL": 5
+      },
+      "posiciones": 36,
+      "prob_media": {
+        "BENIGN": 0.4804,
+        "INSITU": 0.2913,
+        "INVASIVE": 0.0394,
+        "NORMAL": 0.1888
+      }
+    },
+    {
+      "wsi": "A03",
+      "tipo": "anotada",
+      "real": "INSITU",
+      "predicha": "INSITU",
+      "recuentos": {
+        "BENIGN": 22,
+        "INSITU": 82,
+        "INVASIVE": 10,
+        "NORMAL": 3
+      },
+      "posiciones": 117,
+      "prob_media": {
+        "BENIGN": 0.2,
+        "INSITU": 0.6646,
+        "INVASIVE": 0.0878,
+        "NORMAL": 0.0476
+      }
+    },
+    {
+      "wsi": "A03",
+      "tipo": "anotada",
+      "real": "INVASIVE",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 10,
+        "INSITU": 3,
+        "INVASIVE": 90,
+        "NORMAL": 1
+      },
+      "posiciones": 104,
+      "prob_media": {
+        "BENIGN": 0.1076,
+        "INSITU": 0.0376,
+        "INVASIVE": 0.843,
+        "NORMAL": 0.0118
+      }
+    },
+    {
+      "wsi": "A03",
+      "tipo": "anotada",
+      "real": "INVASIVE",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 1,
+        "INSITU": 5,
+        "INVASIVE": 82,
+        "NORMAL": 1
+      },
+      "posiciones": 89,
+      "prob_media": {
+        "BENIGN": 0.0379,
+        "INSITU": 0.0679,
+        "INVASIVE": 0.8634,
+        "NORMAL": 0.0308
+      }
+    },
+    {
+      "wsi": "A03",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 0,
+        "INSITU": 0,
+        "INVASIVE": 109,
+        "NORMAL": 2
+      },
+      "posiciones": 111,
+      "prob_media": {
+        "BENIGN": 0.0141,
+        "INSITU": 0.0006,
+        "INVASIVE": 0.9441,
+        "NORMAL": 0.0412
+      }
+    },
+    {
+      "wsi": "A03",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 44,
+        "INSITU": 0,
+        "INVASIVE": 63,
+        "NORMAL": 28
+      },
+      "posiciones": 135,
+      "prob_media": {
+        "BENIGN": 0.3357,
+        "INSITU": 0.0022,
+        "INVASIVE": 0.4563,
+        "NORMAL": 0.2058
+      }
+    },
+    {
+      "wsi": "A03",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 39,
+        "INSITU": 0,
+        "INVASIVE": 58,
+        "NORMAL": 27
+      },
+      "posiciones": 124,
+      "prob_media": {
+        "BENIGN": 0.2989,
+        "INSITU": 0.0056,
+        "INVASIVE": 0.4907,
+        "NORMAL": 0.2048
+      }
+    },
+    {
+      "wsi": "A03",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 31,
+        "INSITU": 0,
+        "INVASIVE": 0,
+        "NORMAL": 41
+      },
+      "posiciones": 72,
+      "prob_media": {
+        "BENIGN": 0.4162,
+        "INSITU": 0.0047,
+        "INVASIVE": 0.0073,
+        "NORMAL": 0.5718
+      }
+    },
+    {
+      "wsi": "A03",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "BENIGN",
+      "recuentos": {
+        "BENIGN": 47,
+        "INSITU": 8,
+        "INVASIVE": 29,
+        "NORMAL": 13
+      },
+      "posiciones": 97,
+      "prob_media": {
+        "BENIGN": 0.4471,
+        "INSITU": 0.1147,
+        "INVASIVE": 0.2851,
+        "NORMAL": 0.1531
+      }
+    },
+    {
+      "wsi": "A03",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 9,
+        "INSITU": 0,
+        "INVASIVE": 77,
+        "NORMAL": 25
+      },
+      "posiciones": 111,
+      "prob_media": {
+        "BENIGN": 0.0957,
+        "INSITU": 0.0113,
+        "INVASIVE": 0.6687,
+        "NORMAL": 0.2243
+      }
+    },
+    {
+      "wsi": "A03",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 7,
+        "INSITU": 14,
+        "INVASIVE": 60,
+        "NORMAL": 10
+      },
+      "posiciones": 91,
+      "prob_media": {
+        "BENIGN": 0.1123,
+        "INSITU": 0.1556,
+        "INVASIVE": 0.6002,
+        "NORMAL": 0.1318
+      }
+    },
+    {
+      "wsi": "A03",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 0,
+        "INSITU": 0,
+        "INVASIVE": 0,
+        "NORMAL": 39
+      },
+      "posiciones": 39,
+      "prob_media": {
+        "BENIGN": 0.0009,
+        "INSITU": 0.0014,
+        "INVASIVE": 0.0009,
+        "NORMAL": 0.9968
+      }
+    },
+    {
+      "wsi": "A03",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "BENIGN",
+      "recuentos": {
+        "BENIGN": 81,
+        "INSITU": 0,
+        "INVASIVE": 36,
+        "NORMAL": 20
+      },
+      "posiciones": 137,
+      "prob_media": {
+        "BENIGN": 0.5679,
+        "INSITU": 0.0046,
+        "INVASIVE": 0.2756,
+        "NORMAL": 0.152
+      }
+    },
+    {
+      "wsi": "A03",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 15,
+        "INSITU": 2,
+        "INVASIVE": 71,
+        "NORMAL": 1
+      },
+      "posiciones": 89,
+      "prob_media": {
+        "BENIGN": 0.2053,
+        "INSITU": 0.0484,
+        "INVASIVE": 0.7039,
+        "NORMAL": 0.0425
+      }
+    },
+    {
+      "wsi": "A07",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 11,
+        "INSITU": 0,
+        "INVASIVE": 1,
+        "NORMAL": 18
+      },
+      "posiciones": 30,
+      "prob_media": {
+        "BENIGN": 0.3137,
+        "INSITU": 0.1145,
+        "INVASIVE": 0.0351,
+        "NORMAL": 0.5367
+      }
+    },
+    {
+      "wsi": "A07",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "INSITU",
+      "recuentos": {
+        "BENIGN": 18,
+        "INSITU": 28,
+        "INVASIVE": 9,
+        "NORMAL": 18
+      },
+      "posiciones": 73,
+      "prob_media": {
+        "BENIGN": 0.2848,
+        "INSITU": 0.3422,
+        "INVASIVE": 0.1444,
+        "NORMAL": 0.2286
+      }
+    },
+    {
+      "wsi": "A07",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "BENIGN",
+      "recuentos": {
+        "BENIGN": 19,
+        "INSITU": 0,
+        "INVASIVE": 0,
+        "NORMAL": 2
+      },
+      "posiciones": 21,
+      "prob_media": {
+        "BENIGN": 0.7429,
+        "INSITU": 0.0633,
+        "INVASIVE": 0.0158,
+        "NORMAL": 0.178
+      }
+    },
+    {
+      "wsi": "A07",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "BENIGN",
+      "recuentos": {
+        "BENIGN": 77,
+        "INSITU": 0,
+        "INVASIVE": 1,
+        "NORMAL": 23
+      },
+      "posiciones": 101,
+      "prob_media": {
+        "BENIGN": 0.6949,
+        "INSITU": 0.0413,
+        "INVASIVE": 0.0474,
+        "NORMAL": 0.2164
+      }
+    },
+    {
+      "wsi": "A07",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "BENIGN",
+      "recuentos": {
+        "BENIGN": 20,
+        "INSITU": 2,
+        "INVASIVE": 0,
+        "NORMAL": 19
+      },
+      "posiciones": 41,
+      "prob_media": {
+        "BENIGN": 0.4419,
+        "INSITU": 0.0934,
+        "INVASIVE": 0.0159,
+        "NORMAL": 0.4487
+      }
+    },
+    {
+      "wsi": "A07",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "BENIGN",
+      "recuentos": {
+        "BENIGN": 34,
+        "INSITU": 3,
+        "INVASIVE": 0,
+        "NORMAL": 14
+      },
+      "posiciones": 51,
+      "prob_media": {
+        "BENIGN": 0.5491,
+        "INSITU": 0.0614,
+        "INVASIVE": 0.0263,
+        "NORMAL": 0.3632
+      }
+    },
+    {
+      "wsi": "A07",
+      "tipo": "anotada",
+      "real": "INVASIVE",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 22,
+        "INSITU": 16,
+        "INVASIVE": 257,
+        "NORMAL": 5
+      },
+      "posiciones": 300,
+      "prob_media": {
+        "BENIGN": 0.082,
+        "INSITU": 0.0457,
+        "INVASIVE": 0.8478,
+        "NORMAL": 0.0245
+      }
+    },
+    {
+      "wsi": "A07",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 18,
+        "INSITU": 0,
+        "INVASIVE": 64,
+        "NORMAL": 35
+      },
+      "posiciones": 117,
+      "prob_media": {
+        "BENIGN": 0.1659,
+        "INSITU": 0.0146,
+        "INVASIVE": 0.5234,
+        "NORMAL": 0.2961
+      }
+    },
+    {
+      "wsi": "A07",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 21,
+        "INSITU": 2,
+        "INVASIVE": 56,
+        "NORMAL": 13
+      },
+      "posiciones": 92,
+      "prob_media": {
+        "BENIGN": 0.2511,
+        "INSITU": 0.0235,
+        "INVASIVE": 0.6031,
+        "NORMAL": 0.1223
+      }
+    },
+    {
+      "wsi": "A07",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 22,
+        "INSITU": 0,
+        "INVASIVE": 23,
+        "NORMAL": 74
+      },
+      "posiciones": 119,
+      "prob_media": {
+        "BENIGN": 0.2031,
+        "INSITU": 0.0248,
+        "INVASIVE": 0.1795,
+        "NORMAL": 0.5926
+      }
+    },
+    {
+      "wsi": "A07",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 3,
+        "INSITU": 4,
+        "INVASIVE": 19,
+        "NORMAL": 55
+      },
+      "posiciones": 81,
+      "prob_media": {
+        "BENIGN": 0.0668,
+        "INSITU": 0.0543,
+        "INVASIVE": 0.2195,
+        "NORMAL": 0.6594
+      }
+    },
+    {
+      "wsi": "A07",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 24,
+        "INSITU": 0,
+        "INVASIVE": 13,
+        "NORMAL": 34
+      },
+      "posiciones": 71,
+      "prob_media": {
+        "BENIGN": 0.3031,
+        "INSITU": 0.0226,
+        "INVASIVE": 0.1979,
+        "NORMAL": 0.4763
+      }
+    },
+    {
+      "wsi": "A07",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 21,
+        "INSITU": 5,
+        "INVASIVE": 7,
+        "NORMAL": 38
+      },
+      "posiciones": 71,
+      "prob_media": {
+        "BENIGN": 0.2901,
+        "INSITU": 0.0929,
+        "INVASIVE": 0.1206,
+        "NORMAL": 0.4965
+      }
+    },
+    {
+      "wsi": "A07",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 22,
+        "INSITU": 0,
+        "INVASIVE": 16,
+        "NORMAL": 71
+      },
+      "posiciones": 109,
+      "prob_media": {
+        "BENIGN": 0.2438,
+        "INSITU": 0.0051,
+        "INVASIVE": 0.15,
+        "NORMAL": 0.6011
+      }
+    },
+    {
+      "wsi": "A07",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "BENIGN",
+      "recuentos": {
+        "BENIGN": 72,
+        "INSITU": 3,
+        "INVASIVE": 28,
+        "NORMAL": 41
+      },
+      "posiciones": 144,
+      "prob_media": {
+        "BENIGN": 0.4817,
+        "INSITU": 0.022,
+        "INVASIVE": 0.2039,
+        "NORMAL": 0.2925
+      }
+    },
+    {
+      "wsi": "A07",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 6,
+        "INSITU": 0,
+        "INVASIVE": 41,
+        "NORMAL": 69
+      },
+      "posiciones": 116,
+      "prob_media": {
+        "BENIGN": 0.0883,
+        "INSITU": 0.0241,
+        "INVASIVE": 0.3538,
+        "NORMAL": 0.5338
+      }
+    },
+    {
+      "wsi": "A07",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 8,
+        "INSITU": 4,
+        "INVASIVE": 25,
+        "NORMAL": 58
+      },
+      "posiciones": 95,
+      "prob_media": {
+        "BENIGN": 0.1806,
+        "INSITU": 0.0597,
+        "INVASIVE": 0.2535,
+        "NORMAL": 0.5062
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 0,
+        "INSITU": 11,
+        "INVASIVE": 23,
+        "NORMAL": 0
+      },
+      "posiciones": 34,
+      "prob_media": {
+        "BENIGN": 0.0013,
+        "INSITU": 0.298,
+        "INVASIVE": 0.6872,
+        "NORMAL": 0.0135
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "INSITU",
+      "recuentos": {
+        "BENIGN": 5,
+        "INSITU": 19,
+        "INVASIVE": 12,
+        "NORMAL": 2
+      },
+      "posiciones": 38,
+      "prob_media": {
+        "BENIGN": 0.1456,
+        "INSITU": 0.4513,
+        "INVASIVE": 0.3119,
+        "NORMAL": 0.0912
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 14,
+        "INSITU": 13,
+        "INVASIVE": 28,
+        "NORMAL": 5
+      },
+      "posiciones": 60,
+      "prob_media": {
+        "BENIGN": 0.2663,
+        "INSITU": 0.2211,
+        "INVASIVE": 0.4179,
+        "NORMAL": 0.0947
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "BENIGN",
+      "recuentos": {
+        "BENIGN": 22,
+        "INSITU": 14,
+        "INVASIVE": 0,
+        "NORMAL": 1
+      },
+      "posiciones": 37,
+      "prob_media": {
+        "BENIGN": 0.4919,
+        "INSITU": 0.3496,
+        "INVASIVE": 0.0357,
+        "NORMAL": 0.1227
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "anotada",
+      "real": "INVASIVE",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 13,
+        "INSITU": 1,
+        "INVASIVE": 31,
+        "NORMAL": 0
+      },
+      "posiciones": 45,
+      "prob_media": {
+        "BENIGN": 0.2721,
+        "INSITU": 0.0856,
+        "INVASIVE": 0.6048,
+        "NORMAL": 0.0374
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "anotada",
+      "real": "INVASIVE",
+      "predicha": "INSITU",
+      "recuentos": {
+        "BENIGN": 1,
+        "INSITU": 7,
+        "INVASIVE": 0,
+        "NORMAL": 0
+      },
+      "posiciones": 8,
+      "prob_media": {
+        "BENIGN": 0.0802,
+        "INSITU": 0.8651,
+        "INVASIVE": 0.0004,
+        "NORMAL": 0.0544
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "INSITU",
+      "recuentos": {
+        "BENIGN": 8,
+        "INSITU": 14,
+        "INVASIVE": 0,
+        "NORMAL": 1
+      },
+      "posiciones": 23,
+      "prob_media": {
+        "BENIGN": 0.2902,
+        "INSITU": 0.5481,
+        "INVASIVE": 0.0529,
+        "NORMAL": 0.1088
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "INSITU",
+      "recuentos": {
+        "BENIGN": 4,
+        "INSITU": 9,
+        "INVASIVE": 4,
+        "NORMAL": 0
+      },
+      "posiciones": 17,
+      "prob_media": {
+        "BENIGN": 0.2677,
+        "INSITU": 0.5065,
+        "INVASIVE": 0.2092,
+        "NORMAL": 0.0166
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "BENIGN",
+      "recuentos": {
+        "BENIGN": 2,
+        "INSITU": 0,
+        "INVASIVE": 0,
+        "NORMAL": 0
+      },
+      "posiciones": 2,
+      "prob_media": {
+        "BENIGN": 0.4723,
+        "INSITU": 0.4302,
+        "INVASIVE": 0.0023,
+        "NORMAL": 0.0952
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "INSITU",
+      "recuentos": {
+        "BENIGN": 8,
+        "INSITU": 12,
+        "INVASIVE": 8,
+        "NORMAL": 0
+      },
+      "posiciones": 28,
+      "prob_media": {
+        "BENIGN": 0.3322,
+        "INSITU": 0.3729,
+        "INVASIVE": 0.2643,
+        "NORMAL": 0.0306
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 0,
+        "INSITU": 0,
+        "INVASIVE": 12,
+        "NORMAL": 0
+      },
+      "posiciones": 12,
+      "prob_media": {
+        "BENIGN": 0.0329,
+        "INSITU": 0.002,
+        "INVASIVE": 0.911,
+        "NORMAL": 0.0541
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "BENIGN",
+      "recuentos": {
+        "BENIGN": 46,
+        "INSITU": 8,
+        "INVASIVE": 13,
+        "NORMAL": 9
+      },
+      "posiciones": 76,
+      "prob_media": {
+        "BENIGN": 0.5304,
+        "INSITU": 0.1401,
+        "INVASIVE": 0.1861,
+        "NORMAL": 0.1434
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "anotada",
+      "real": "INVASIVE",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 9,
+        "INSITU": 8,
+        "INVASIVE": 188,
+        "NORMAL": 0
+      },
+      "posiciones": 205,
+      "prob_media": {
+        "BENIGN": 0.0546,
+        "INSITU": 0.0519,
+        "INVASIVE": 0.8901,
+        "NORMAL": 0.0034
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 35,
+        "INSITU": 0,
+        "INVASIVE": 80,
+        "NORMAL": 23
+      },
+      "posiciones": 138,
+      "prob_media": {
+        "BENIGN": 0.2539,
+        "INSITU": 0.0146,
+        "INVASIVE": 0.5609,
+        "NORMAL": 0.1706
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 6,
+        "INSITU": 0,
+        "INVASIVE": 72,
+        "NORMAL": 36
+      },
+      "posiciones": 114,
+      "prob_media": {
+        "BENIGN": 0.0801,
+        "INSITU": 0.007,
+        "INVASIVE": 0.5655,
+        "NORMAL": 0.3473
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 30,
+        "INSITU": 0,
+        "INVASIVE": 8,
+        "NORMAL": 31
+      },
+      "posiciones": 69,
+      "prob_media": {
+        "BENIGN": 0.4351,
+        "INSITU": 0.0032,
+        "INVASIVE": 0.1322,
+        "NORMAL": 0.4295
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 42,
+        "INSITU": 1,
+        "INVASIVE": 67,
+        "NORMAL": 2
+      },
+      "posiciones": 112,
+      "prob_media": {
+        "BENIGN": 0.3474,
+        "INSITU": 0.0148,
+        "INVASIVE": 0.5742,
+        "NORMAL": 0.0636
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 9,
+        "INSITU": 0,
+        "INVASIVE": 77,
+        "NORMAL": 16
+      },
+      "posiciones": 102,
+      "prob_media": {
+        "BENIGN": 0.1289,
+        "INSITU": 0.0021,
+        "INVASIVE": 0.6841,
+        "NORMAL": 0.1849
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 0,
+        "INSITU": 0,
+        "INVASIVE": 97,
+        "NORMAL": 47
+      },
+      "posiciones": 144,
+      "prob_media": {
+        "BENIGN": 0.0249,
+        "INSITU": 0.0119,
+        "INVASIVE": 0.6217,
+        "NORMAL": 0.3415
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 28,
+        "INSITU": 0,
+        "INVASIVE": 22,
+        "NORMAL": 51
+      },
+      "posiciones": 101,
+      "prob_media": {
+        "BENIGN": 0.3009,
+        "INSITU": 0.0085,
+        "INVASIVE": 0.2363,
+        "NORMAL": 0.4543
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 29,
+        "INSITU": 25,
+        "INVASIVE": 71,
+        "NORMAL": 0
+      },
+      "posiciones": 125,
+      "prob_media": {
+        "BENIGN": 0.2314,
+        "INSITU": 0.1869,
+        "INVASIVE": 0.5722,
+        "NORMAL": 0.0094
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 8,
+        "INSITU": 1,
+        "INVASIVE": 102,
+        "NORMAL": 29
+      },
+      "posiciones": 140,
+      "prob_media": {
+        "BENIGN": 0.0885,
+        "INSITU": 0.0161,
+        "INVASIVE": 0.6798,
+        "NORMAL": 0.2156
+      }
+    },
+    {
+      "wsi": "A05",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 5,
+        "INSITU": 3,
+        "INVASIVE": 128,
+        "NORMAL": 6
+      },
+      "posiciones": 142,
+      "prob_media": {
+        "BENIGN": 0.0763,
+        "INSITU": 0.0328,
+        "INVASIVE": 0.809,
+        "NORMAL": 0.0818
+      }
+    },
+    {
+      "wsi": "A09",
+      "tipo": "anotada",
+      "real": "INVASIVE",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 0,
+        "INSITU": 1,
+        "INVASIVE": 11,
+        "NORMAL": 3
+      },
+      "posiciones": 15,
+      "prob_media": {
+        "BENIGN": 0.043,
+        "INSITU": 0.1581,
+        "INVASIVE": 0.5524,
+        "NORMAL": 0.2466
+      }
+    },
+    {
+      "wsi": "A09",
+      "tipo": "anotada",
+      "real": "INVASIVE",
+      "predicha": "BENIGN",
+      "recuentos": {
+        "BENIGN": 4,
+        "INSITU": 0,
+        "INVASIVE": 1,
+        "NORMAL": 0
+      },
+      "posiciones": 5,
+      "prob_media": {
+        "BENIGN": 0.5089,
+        "INSITU": 0.15,
+        "INVASIVE": 0.3126,
+        "NORMAL": 0.0286
+      }
+    },
+    {
+      "wsi": "A09",
+      "tipo": "anotada",
+      "real": "INVASIVE",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 1,
+        "INSITU": 2,
+        "INVASIVE": 3,
+        "NORMAL": 9
+      },
+      "posiciones": 15,
+      "prob_media": {
+        "BENIGN": 0.1133,
+        "INSITU": 0.0998,
+        "INVASIVE": 0.2608,
+        "NORMAL": 0.526
+      }
+    },
+    {
+      "wsi": "A09",
+      "tipo": "anotada",
+      "real": "INVASIVE",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 1,
+        "INSITU": 4,
+        "INVASIVE": 11,
+        "NORMAL": 0
+      },
+      "posiciones": 16,
+      "prob_media": {
+        "BENIGN": 0.0997,
+        "INSITU": 0.2621,
+        "INVASIVE": 0.6372,
+        "NORMAL": 0.001
+      }
+    },
+    {
+      "wsi": "A09",
+      "tipo": "anotada",
+      "real": "INVASIVE",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 9,
+        "INSITU": 7,
+        "INVASIVE": 108,
+        "NORMAL": 3
+      },
+      "posiciones": 127,
+      "prob_media": {
+        "BENIGN": 0.0973,
+        "INSITU": 0.0543,
+        "INVASIVE": 0.8145,
+        "NORMAL": 0.0339
+      }
+    },
+    {
+      "wsi": "A09",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 0,
+        "INSITU": 5,
+        "INVASIVE": 73,
+        "NORMAL": 9
+      },
+      "posiciones": 87,
+      "prob_media": {
+        "BENIGN": 0.0178,
+        "INSITU": 0.0458,
+        "INVASIVE": 0.8313,
+        "NORMAL": 0.1051
+      }
+    },
+    {
+      "wsi": "A09",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "BENIGN",
+      "recuentos": {
+        "BENIGN": 25,
+        "INSITU": 0,
+        "INVASIVE": 15,
+        "NORMAL": 17
+      },
+      "posiciones": 57,
+      "prob_media": {
+        "BENIGN": 0.4458,
+        "INSITU": 0.0064,
+        "INVASIVE": 0.2483,
+        "NORMAL": 0.2995
+      }
+    },
+    {
+      "wsi": "A09",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 1,
+        "INSITU": 0,
+        "INVASIVE": 0,
+        "NORMAL": 27
+      },
+      "posiciones": 28,
+      "prob_media": {
+        "BENIGN": 0.1098,
+        "INSITU": 0.0001,
+        "INVASIVE": 0.0004,
+        "NORMAL": 0.8897
+      }
+    },
+    {
+      "wsi": "A09",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 7,
+        "INSITU": 1,
+        "INVASIVE": 85,
+        "NORMAL": 13
+      },
+      "posiciones": 106,
+      "prob_media": {
+        "BENIGN": 0.1232,
+        "INSITU": 0.0094,
+        "INVASIVE": 0.7301,
+        "NORMAL": 0.1373
+      }
+    },
+    {
+      "wsi": "A09",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 39,
+        "INSITU": 26,
+        "INVASIVE": 66,
+        "NORMAL": 5
+      },
+      "posiciones": 136,
+      "prob_media": {
+        "BENIGN": 0.2831,
+        "INSITU": 0.1776,
+        "INVASIVE": 0.4867,
+        "NORMAL": 0.0526
+      }
+    },
+    {
+      "wsi": "A09",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 17,
+        "INSITU": 0,
+        "INVASIVE": 37,
+        "NORMAL": 14
+      },
+      "posiciones": 68,
+      "prob_media": {
+        "BENIGN": 0.2877,
+        "INSITU": 0.0015,
+        "INVASIVE": 0.4875,
+        "NORMAL": 0.2234
+      }
+    },
+    {
+      "wsi": "A09",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 7,
+        "INSITU": 0,
+        "INVASIVE": 17,
+        "NORMAL": 33
+      },
+      "posiciones": 57,
+      "prob_media": {
+        "BENIGN": 0.1493,
+        "INSITU": 0.0014,
+        "INVASIVE": 0.2777,
+        "NORMAL": 0.5716
+      }
+    },
+    {
+      "wsi": "A09",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 2,
+        "INSITU": 0,
+        "INVASIVE": 24,
+        "NORMAL": 56
+      },
+      "posiciones": 82,
+      "prob_media": {
+        "BENIGN": 0.0318,
+        "INSITU": 0.0018,
+        "INVASIVE": 0.2826,
+        "NORMAL": 0.6838
+      }
+    },
+    {
+      "wsi": "A09",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 6,
+        "INSITU": 0,
+        "INVASIVE": 0,
+        "NORMAL": 36
+      },
+      "posiciones": 42,
+      "prob_media": {
+        "BENIGN": 0.1976,
+        "INSITU": 0.0003,
+        "INVASIVE": 0.0086,
+        "NORMAL": 0.7935
+      }
+    },
+    {
+      "wsi": "A09",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "BENIGN",
+      "recuentos": {
+        "BENIGN": 28,
+        "INSITU": 8,
+        "INVASIVE": 10,
+        "NORMAL": 19
+      },
+      "posiciones": 65,
+      "prob_media": {
+        "BENIGN": 0.3973,
+        "INSITU": 0.1241,
+        "INVASIVE": 0.1685,
+        "NORMAL": 0.3102
+      }
+    },
+    {
+      "wsi": "A09",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "BENIGN",
+      "recuentos": {
+        "BENIGN": 55,
+        "INSITU": 32,
+        "INVASIVE": 2,
+        "NORMAL": 12
+      },
+      "posiciones": 101,
+      "prob_media": {
+        "BENIGN": 0.5456,
+        "INSITU": 0.3202,
+        "INVASIVE": 0.0259,
+        "NORMAL": 0.1083
+      }
+    },
+    {
+      "wsi": "A10",
+      "tipo": "anotada",
+      "real": "INVASIVE",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 17,
+        "INSITU": 7,
+        "INVASIVE": 112,
+        "NORMAL": 7
+      },
+      "posiciones": 143,
+      "prob_media": {
+        "BENIGN": 0.1406,
+        "INSITU": 0.0549,
+        "INVASIVE": 0.7437,
+        "NORMAL": 0.0608
+      }
+    },
+    {
+      "wsi": "A10",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 9,
+        "INSITU": 5,
+        "INVASIVE": 5,
+        "NORMAL": 52
+      },
+      "posiciones": 71,
+      "prob_media": {
+        "BENIGN": 0.136,
+        "INSITU": 0.0829,
+        "INVASIVE": 0.0863,
+        "NORMAL": 0.6948
+      }
+    },
+    {
+      "wsi": "A10",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 0,
+        "INSITU": 0,
+        "INVASIVE": 22,
+        "NORMAL": 47
+      },
+      "posiciones": 69,
+      "prob_media": {
+        "BENIGN": 0.0287,
+        "INSITU": 0.0034,
+        "INVASIVE": 0.2799,
+        "NORMAL": 0.6879
+      }
+    },
+    {
+      "wsi": "A10",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 6,
+        "INSITU": 16,
+        "INVASIVE": 50,
+        "NORMAL": 22
+      },
+      "posiciones": 94,
+      "prob_media": {
+        "BENIGN": 0.0624,
+        "INSITU": 0.1838,
+        "INVASIVE": 0.4978,
+        "NORMAL": 0.2559
+      }
+    },
+    {
+      "wsi": "A10",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 0,
+        "INSITU": 0,
+        "INVASIVE": 0,
+        "NORMAL": 62
+      },
+      "posiciones": 62,
+      "prob_media": {
+        "BENIGN": 0.0271,
+        "INSITU": 0.0012,
+        "INVASIVE": 0.0253,
+        "NORMAL": 0.9464
+      }
+    },
+    {
+      "wsi": "A10",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 0,
+        "INSITU": 1,
+        "INVASIVE": 83,
+        "NORMAL": 7
+      },
+      "posiciones": 91,
+      "prob_media": {
+        "BENIGN": 0.0236,
+        "INSITU": 0.0343,
+        "INVASIVE": 0.8326,
+        "NORMAL": 0.1095
+      }
+    },
+    {
+      "wsi": "A10",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 9,
+        "INSITU": 0,
+        "INVASIVE": 35,
+        "NORMAL": 59
+      },
+      "posiciones": 103,
+      "prob_media": {
+        "BENIGN": 0.1171,
+        "INSITU": 0.0028,
+        "INVASIVE": 0.337,
+        "NORMAL": 0.5431
+      }
+    },
+    {
+      "wsi": "A10",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 6,
+        "INSITU": 0,
+        "INVASIVE": 65,
+        "NORMAL": 21
+      },
+      "posiciones": 92,
+      "prob_media": {
+        "BENIGN": 0.0873,
+        "INSITU": 0.0004,
+        "INVASIVE": 0.6599,
+        "NORMAL": 0.2524
+      }
+    },
+    {
+      "wsi": "A10",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 3,
+        "INSITU": 0,
+        "INVASIVE": 44,
+        "NORMAL": 5
+      },
+      "posiciones": 52,
+      "prob_media": {
+        "BENIGN": 0.0822,
+        "INSITU": 0.0176,
+        "INVASIVE": 0.7608,
+        "NORMAL": 0.1393
+      }
+    },
+    {
+      "wsi": "A10",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 1,
+        "INSITU": 11,
+        "INVASIVE": 106,
+        "NORMAL": 5
+      },
+      "posiciones": 123,
+      "prob_media": {
+        "BENIGN": 0.0301,
+        "INSITU": 0.1071,
+        "INVASIVE": 0.778,
+        "NORMAL": 0.0847
+      }
+    },
+    {
+      "wsi": "A10",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 14,
+        "INSITU": 0,
+        "INVASIVE": 52,
+        "NORMAL": 6
+      },
+      "posiciones": 72,
+      "prob_media": {
+        "BENIGN": 0.268,
+        "INSITU": 0.0079,
+        "INVASIVE": 0.6146,
+        "NORMAL": 0.1095
+      }
+    },
+    {
+      "wsi": "A06",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "BENIGN",
+      "recuentos": {
+        "BENIGN": 91,
+        "INSITU": 4,
+        "INVASIVE": 2,
+        "NORMAL": 11
+      },
+      "posiciones": 108,
+      "prob_media": {
+        "BENIGN": 0.7966,
+        "INSITU": 0.0643,
+        "INVASIVE": 0.0401,
+        "NORMAL": 0.099
+      }
+    },
+    {
+      "wsi": "A06",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "BENIGN",
+      "recuentos": {
+        "BENIGN": 44,
+        "INSITU": 1,
+        "INVASIVE": 0,
+        "NORMAL": 4
+      },
+      "posiciones": 49,
+      "prob_media": {
+        "BENIGN": 0.8203,
+        "INSITU": 0.0178,
+        "INVASIVE": 0.0172,
+        "NORMAL": 0.1447
+      }
+    },
+    {
+      "wsi": "A06",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "BENIGN",
+      "recuentos": {
+        "BENIGN": 24,
+        "INSITU": 5,
+        "INVASIVE": 0,
+        "NORMAL": 1
+      },
+      "posiciones": 30,
+      "prob_media": {
+        "BENIGN": 0.7123,
+        "INSITU": 0.1876,
+        "INVASIVE": 0.0145,
+        "NORMAL": 0.0856
+      }
+    },
+    {
+      "wsi": "A06",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "BENIGN",
+      "recuentos": {
+        "BENIGN": 12,
+        "INSITU": 1,
+        "INVASIVE": 2,
+        "NORMAL": 9
+      },
+      "posiciones": 24,
+      "prob_media": {
+        "BENIGN": 0.47,
+        "INSITU": 0.0673,
+        "INVASIVE": 0.0631,
+        "NORMAL": 0.3996
+      }
+    },
+    {
+      "wsi": "A06",
+      "tipo": "anotada",
+      "real": "BENIGN",
+      "predicha": "BENIGN",
+      "recuentos": {
+        "BENIGN": 64,
+        "INSITU": 29,
+        "INVASIVE": 20,
+        "NORMAL": 6
+      },
+      "posiciones": 119,
+      "prob_media": {
+        "BENIGN": 0.5278,
+        "INSITU": 0.2439,
+        "INVASIVE": 0.1716,
+        "NORMAL": 0.0567
+      }
+    },
+    {
+      "wsi": "A06",
+      "tipo": "anotada",
+      "real": "INVASIVE",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 10,
+        "INSITU": 49,
+        "INVASIVE": 165,
+        "NORMAL": 5
+      },
+      "posiciones": 229,
+      "prob_media": {
+        "BENIGN": 0.067,
+        "INSITU": 0.2171,
+        "INVASIVE": 0.6847,
+        "NORMAL": 0.0311
+      }
+    },
+    {
+      "wsi": "A06",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 4,
+        "INSITU": 24,
+        "INVASIVE": 8,
+        "NORMAL": 46
+      },
+      "posiciones": 82,
+      "prob_media": {
+        "BENIGN": 0.0787,
+        "INSITU": 0.2866,
+        "INVASIVE": 0.0968,
+        "NORMAL": 0.5379
+      }
+    },
+    {
+      "wsi": "A06",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 0,
+        "INSITU": 12,
+        "INVASIVE": 56,
+        "NORMAL": 30
+      },
+      "posiciones": 98,
+      "prob_media": {
+        "BENIGN": 0.0565,
+        "INSITU": 0.1335,
+        "INVASIVE": 0.5375,
+        "NORMAL": 0.2724
+      }
+    },
+    {
+      "wsi": "A06",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 17,
+        "INSITU": 0,
+        "INVASIVE": 72,
+        "NORMAL": 18
+      },
+      "posiciones": 107,
+      "prob_media": {
+        "BENIGN": 0.1529,
+        "INSITU": 0.0014,
+        "INVASIVE": 0.6175,
+        "NORMAL": 0.2282
+      }
+    },
+    {
+      "wsi": "A06",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INSITU",
+      "recuentos": {
+        "BENIGN": 32,
+        "INSITU": 33,
+        "INVASIVE": 31,
+        "NORMAL": 23
+      },
+      "posiciones": 119,
+      "prob_media": {
+        "BENIGN": 0.2769,
+        "INSITU": 0.2453,
+        "INVASIVE": 0.2709,
+        "NORMAL": 0.2069
+      }
+    },
+    {
+      "wsi": "A06",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 3,
+        "INSITU": 0,
+        "INVASIVE": 25,
+        "NORMAL": 69
+      },
+      "posiciones": 97,
+      "prob_media": {
+        "BENIGN": 0.0832,
+        "INSITU": 0.001,
+        "INVASIVE": 0.2612,
+        "NORMAL": 0.6545
+      }
+    },
+    {
+      "wsi": "A06",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "BENIGN",
+      "recuentos": {
+        "BENIGN": 28,
+        "INSITU": 0,
+        "INVASIVE": 26,
+        "NORMAL": 28
+      },
+      "posiciones": 82,
+      "prob_media": {
+        "BENIGN": 0.3823,
+        "INSITU": 0.002,
+        "INVASIVE": 0.3053,
+        "NORMAL": 0.3103
+      }
+    },
+    {
+      "wsi": "A06",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "INVASIVE",
+      "recuentos": {
+        "BENIGN": 29,
+        "INSITU": 0,
+        "INVASIVE": 61,
+        "NORMAL": 22
+      },
+      "posiciones": 112,
+      "prob_media": {
+        "BENIGN": 0.2552,
+        "INSITU": 0.0085,
+        "INVASIVE": 0.5104,
+        "NORMAL": 0.2259
+      }
+    },
+    {
+      "wsi": "A06",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 28,
+        "INSITU": 0,
+        "INVASIVE": 2,
+        "NORMAL": 35
+      },
+      "posiciones": 65,
+      "prob_media": {
+        "BENIGN": 0.3953,
+        "INSITU": 0.0448,
+        "INVASIVE": 0.0748,
+        "NORMAL": 0.485
+      }
+    },
+    {
+      "wsi": "A06",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 28,
+        "INSITU": 0,
+        "INVASIVE": 8,
+        "NORMAL": 73
+      },
+      "posiciones": 109,
+      "prob_media": {
+        "BENIGN": 0.2488,
+        "INSITU": 0.01,
+        "INVASIVE": 0.0957,
+        "NORMAL": 0.6455
+      }
+    },
+    {
+      "wsi": "A06",
+      "tipo": "sin_anotar",
+      "real": "NORMAL",
+      "predicha": "NORMAL",
+      "recuentos": {
+        "BENIGN": 2,
+        "INSITU": 0,
+        "INVASIVE": 30,
+        "NORMAL": 57
+      },
+      "posiciones": 89,
+      "prob_media": {
+        "BENIGN": 0.0405,
+        "INSITU": 0.0007,
+        "INVASIVE": 0.3464,
+        "NORMAL": 0.6125
+      }
+    }
+  ]
+}

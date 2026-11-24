@@ -74,6 +74,102 @@
   text-align: right;
 }
 
+.tissue-threshold {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid rgba(178, 69, 146, 0.25);
+  border-radius: 8px;
+  background: rgba(142, 45, 226, 0.07);
+}
+
+.tissue-threshold-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tissue-threshold-head label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #d8c6ec;
+}
+
+.tissue-threshold-value {
+  font-size: 12px;
+  color: #d8c6ec;
+  font-variant-numeric: tabular-nums;
+}
+
+.tissue-threshold input[type='range'] {
+  width: 100%;
+  accent-color: #b24592;
+}
+
+.tissue-threshold-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #9f8fb5;
+}
+
+.tissue-threshold-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: #d8c6ec;
+}
+
+.tissue-threshold-preview strong {
+  color: #fbbf24;
+}
+
+.tissue-threshold-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.tissue-threshold-apply,
+.tissue-threshold-discard,
+.tissue-threshold-reset {
+  padding: 5px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tissue-threshold-apply {
+  border: none;
+  background: linear-gradient(135deg, #8e2de2 0%, #b24592 100%);
+  color: #fff;
+}
+
+.tissue-threshold-discard,
+.tissue-threshold-reset {
+  border: 1px solid rgba(178, 69, 146, 0.35);
+  background: transparent;
+  color: #cf8fd8;
+}
+
+.tissue-threshold-reset {
+  align-self: flex-start;
+}
+
+.tissue-threshold-apply:disabled,
+.tissue-threshold-discard:disabled,
+.tissue-threshold-reset:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .tissue-stats {
   display: flex;
   align-items: center;

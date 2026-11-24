@@ -170,3 +170,9 @@ test.db
 *.pth
 *.pt
 *.onnx
+
+# Datos descargados para validar la IA (WSI de BACH)
+datos_bach/
+
+# Formularios de la evaluación de usabilidad (solo en local)
+docs/evaluacion/Formulario_*

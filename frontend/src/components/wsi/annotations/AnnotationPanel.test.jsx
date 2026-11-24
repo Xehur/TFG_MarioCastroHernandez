@@ -23,7 +23,7 @@ describe('AnnotationPanel', () => {
     render(<AnnotationPanel annotations={annotations} classes={classes} loading={false} />);
     expect(screen.getByText('Zona A')).toBeInTheDocument();
     expect(screen.getByText('Tumor')).toBeInTheDocument();
-    expect(screen.getByText('(sin etiqueta)')).toBeInTheDocument();
+    expect(screen.getByText('(sin nombre)')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument(); // contador
   });
 

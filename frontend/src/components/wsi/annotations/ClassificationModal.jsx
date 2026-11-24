@@ -2,7 +2,10 @@ import { useState } from 'react';
 import './ClassificationModal.css';
 
 /**
- * Modal para clasificar/etiquetar una anotación recién dibujada o existente.
+ * Modal para nombrar y, opcionalmente, clasificar una anotación recién
+ * dibujada o existente. La clasificación es opcional: una anotación puede
+ * guardarse solo con su nombre (p. ej. para marcar una zona de interés).
+ * Se exige al menos un nombre o una clasificación.
  *
  * Props:
  * - shape: { shape_type } de la forma (pendiente o existente)
@@ -22,7 +25,7 @@ const ClassificationModal = ({
   initialLabel = '',
   initialClassId = null,
   initialColor = null,
-  title = 'Clasificar anotación',
+  title = 'Nueva anotación',
   submitLabel = 'Guardar',
   onCreateClass,
   onSubmit,
@@ -35,6 +38,7 @@ const ClassificationModal = ({
   const [newClassName, setNewClassName] = useState('');
   const [newClassColor, setNewClassColor] = useState('#FF0000');
   const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState(null);
 
   const handleSelectClass = value => {
     setClassId(value);
@@ -53,6 +57,11 @@ const ClassificationModal = ({
 
   const handleSubmit = async e => {
     e.preventDefault();
+    if (!label.trim() && !classId) {
+      setFormError('Escribe un nombre o elige una clasificación.');
+      return;
+    }
+    setFormError(null);
     setSubmitting(true);
     try {
       await onSubmit({
@@ -77,27 +86,44 @@ const ClassificationModal = ({
 
         <form onSubmit={handleSubmit} className="modal-form">
           <div className="modal-field">
-            <label htmlFor="label">Etiqueta</label>
+            <label htmlFor="label">Nombre de la anotación</label>
             <input
               id="label"
               type="text"
               value={label}
-              onChange={e => setLabel(e.target.value)}
-              placeholder="p.ej. Mitosis, Zona dudosa…"
+              onChange={e => {
+                setLabel(e.target.value);
+                setFormError(null);
+              }}
+              placeholder="p.ej. Zona de interés, Mitosis…"
+              maxLength={255}
               autoFocus
             />
           </div>
 
           <div className="modal-field">
-            <label htmlFor="class">Clasificación</label>
-            <select id="class" value={classId} onChange={e => handleSelectClass(e.target.value)}>
-              <option value="">Sin clasificar</option>
+            <label htmlFor="class">Clasificación (opcional)</label>
+            <select
+              id="class"
+              value={classId}
+              onChange={e => {
+                handleSelectClass(e.target.value);
+                setFormError(null);
+              }}
+            >
+              <option value="">Ninguna: solo nombre</option>
               {classes.map(c => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
             </select>
+            {!classId && (
+              <p className="modal-hint">
+                La zona se guardará solo con su nombre, sin pertenecer a ninguna
+                clase.
+              </p>
+            )}
           </div>
 
           {!creatingClass ? (
@@ -127,6 +153,12 @@ const ClassificationModal = ({
             <label htmlFor="color">Color</label>
             <input id="color" type="color" value={color} onChange={e => setColor(e.target.value)} />
           </div>
+
+          {formError && (
+            <p className="modal-error" role="alert">
+              {formError}
+            </p>
+          )}
 
           <div className="modal-actions">
             <button type="button" className="modal-btn modal-btn-cancel" onClick={onCancel}>

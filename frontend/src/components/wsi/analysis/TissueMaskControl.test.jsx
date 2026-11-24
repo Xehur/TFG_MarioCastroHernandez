@@ -6,6 +6,7 @@ vi.mock('../../../services/tissueService', () => ({
   tissueService: {
     getStats: vi.fn(),
     getMaskObjectUrl: vi.fn(),
+    getPreview: vi.fn(),
     analyze: vi.fn(),
   },
 }));
@@ -98,6 +99,68 @@ describe('TissueMaskControl', () => {
 
     fireEvent.click(screen.getByText(/Re-analizar/));
     await waitFor(() => expect(tissueService.analyze).toHaveBeenCalledWith(1));
+  });
+
+  it('el deslizador de umbral muestra una vista previa sin guardarla', async () => {
+    tissueService.getPreview.mockResolvedValue({ url: 'blob:preview', tissuePercent: 15.2 });
+    const viewer = makeViewer();
+    render(<TissueMaskControl viewer={viewer} imageId={1} />);
+    fireEvent.click(screen.getByText('Mostrar'));
+    await screen.findByText('23.4%');
+    expect(screen.getByText(/automático/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Umbral de detección/), {
+      target: { value: '2' },
+    });
+    await waitFor(() => expect(tissueService.getPreview).toHaveBeenCalledWith(1, 2));
+    expect(await screen.findByText('15.2%')).toBeInTheDocument();
+    expect(screen.getByText(/sin guardar/)).toBeInTheDocument();
+    // La vista previa sustituye al overlay, pero no se ha guardado nada.
+    expect(viewer.addSimpleImage).toHaveBeenLastCalledWith(
+      expect.objectContaining({ url: 'blob:preview' })
+    );
+    expect(tissueService.analyze).not.toHaveBeenCalled();
+  });
+
+  it('Aplicar guarda el umbral elegido para la imagen', async () => {
+    tissueService.getPreview.mockResolvedValue({ url: 'blob:preview', tissuePercent: 15.2 });
+    tissueService.analyze.mockResolvedValue({ id: 3 });
+    render(<TissueMaskControl viewer={makeViewer()} imageId={1} />);
+    fireEvent.click(screen.getByText('Mostrar'));
+    await screen.findByText('23.4%');
+
+    fireEvent.change(screen.getByLabelText(/Umbral de detección/), {
+      target: { value: '1.5' },
+    });
+    await screen.findByText('15.2%');
+    tissueService.getStats.mockResolvedValue({
+      result_data: { tissue_percent: 15.0, threshold_factor: 1.5 },
+    });
+    fireEvent.click(screen.getByText('Aplicar'));
+
+    await waitFor(() =>
+      expect(tissueService.analyze).toHaveBeenCalledWith(1, { thresholdFactor: 1.5 })
+    );
+    expect(await screen.findByText('15.0%')).toBeInTheDocument();
+    expect(screen.queryByText(/sin guardar/)).not.toBeInTheDocument();
+    expect(screen.getByText('Volver al umbral automático')).toBeInTheDocument();
+  });
+
+  it('Descartar vuelve a la máscara guardada', async () => {
+    tissueService.getPreview.mockResolvedValue({ url: 'blob:preview', tissuePercent: 15.2 });
+    render(<TissueMaskControl viewer={makeViewer()} imageId={1} />);
+    fireEvent.click(screen.getByText('Mostrar'));
+    await screen.findByText('23.4%');
+
+    fireEvent.change(screen.getByLabelText(/Umbral de detección/), {
+      target: { value: '2' },
+    });
+    await screen.findByText('15.2%');
+    fireEvent.click(screen.getByText('Descartar'));
+
+    await waitFor(() => expect(screen.queryByText(/sin guardar/)).not.toBeInTheDocument());
+    expect(screen.getByText(/automático/)).toBeInTheDocument();
+    expect(tissueService.analyze).not.toHaveBeenCalled();
   });
 
   it('muestra la máscara al invocar show() desde la ref (paleta de comandos)', async () => {

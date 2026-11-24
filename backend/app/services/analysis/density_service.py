@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.analysis import DensityMap
 from app.services.wsi.openslide_service import OpenSlideService
+from app.services.analysis import tissue_service
 from app.services.analysis.tissue_detection import (
     detect_tissue,
     DETECTOR_VERSION,
@@ -74,7 +75,11 @@ def generate_density(
         finally:
             slide.close()
 
-    tissue = tissue if tissue is not None else detect_tissue(rgb)
+    factor = tissue_service.get_threshold_factor(db, image_id)
+    tissue = (
+        tissue if tissue is not None
+        else detect_tissue(rgb, threshold_factor=factor)
+    )
     base_width = int(round(tissue.width * scale))
     base_height = int(round(tissue.height * scale))
 
@@ -101,6 +106,7 @@ def generate_density(
     data["tissue_percent"] = round(tissue.tissue_percent, 4)
     data["detector_mode"] = "classical"
     data["detector_version"] = DETECTOR_VERSION
+    data["threshold_factor"] = tissue.extra.get("threshold_factor", factor)
     # Paradas de color (RGB 0-255) para dibujar el colorbar en el frontend.
     data["colorbar"] = _colormap_lut(colormap, samples=16)
 
@@ -160,7 +166,9 @@ def get_or_create_density(
             data = cached.density_data or {}
             map_path = data.get("map_path")
             # Regenera mapas derivados del antiguo detector de IA para curarlos.
-            mode_ok = data.get("detector_mode") == "classical" and is_current_detector(data)
+            mode_ok = data.get("detector_mode") == "classical" and is_current_detector(
+                data, tissue_service.get_threshold_factor(db, image_id)
+            )
             if map_path and os.path.exists(map_path) and mode_ok:
                 return cached
     return generate_density(db, image_id, file_path, grid_size, colormap)

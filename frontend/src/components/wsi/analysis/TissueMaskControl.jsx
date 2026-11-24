@@ -6,7 +6,15 @@ import {
   forwardRef,
   useImperativeHandle,
 } from 'react';
-import { ScanSearch, Eye, EyeOff, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import {
+  ScanSearch,
+  Eye,
+  EyeOff,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { tissueService } from '../../../services/tissueService';
 import './TissueMaskControl.css';
 
@@ -21,6 +29,11 @@ import './TissueMaskControl.css';
  * - viewer: instancia de OpenSeadragon (o null si aún no está lista)
  * - imageId: id de la imagen
  *
+ * Umbral ajustable: un deslizador cambia el factor de umbral del detector
+ * (1 = automático; menos = más tejido; más = menos tejido) y muestra al momento
+ * una vista previa sin guardarla. "Aplicar" la guarda para la imagen (también
+ * la usan la densidad y la clasificación IA) y "Descartar" vuelve a la guardada.
+ *
  * Ref imperativa (para la paleta de comandos):
  * - toggle(): alterna la visibilidad de la máscara.
  * - show(): fuerza que la máscara se muestre.
@@ -32,8 +45,16 @@ const TissueMaskControl = forwardRef(({ viewer, imageId }, ref) => {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
 
+  // Umbral: factor guardado (`savedFactor`) y el del deslizador (`factor`).
+  const [savedFactor, setSavedFactor] = useState(1);
+  const [factor, setFactor] = useState(1);
+  const [preview, setPreview] = useState(null); // { tissuePercent } o null
+  const [previewLoading, setPreviewLoading] = useState(false);
+
   const maskItemRef = useRef(null);
   const objectUrlRef = useRef(null);
+  const previewTimerRef = useRef(null);
+  const previewSeqRef = useRef(0);
 
   const removeOverlay = useCallback(() => {
     if (viewer && maskItemRef.current) {
@@ -68,6 +89,14 @@ const TissueMaskControl = forwardRef(({ viewer, imageId }, ref) => {
     [viewer, opacity]
   );
 
+  const applyStats = useCallback(data => {
+    setStats(data);
+    const stored = Number(data?.threshold_factor ?? 1);
+    setSavedFactor(stored);
+    setFactor(stored);
+    setPreview(null);
+  }, []);
+
   const addOverlay = useCallback(async () => {
     if (!viewer) return;
     setLoading(true);
@@ -77,7 +106,7 @@ const TissueMaskControl = forwardRef(({ viewer, imageId }, ref) => {
         tissueService.getStats(imageId),
         tissueService.getMaskObjectUrl(imageId),
       ]);
-      setStats(statData.result_data || null);
+      applyStats(statData.result_data || null);
       objectUrlRef.current = url;
       showMask(url);
     } catch (err) {
@@ -88,7 +117,96 @@ const TissueMaskControl = forwardRef(({ viewer, imageId }, ref) => {
     } finally {
       setLoading(false);
     }
-  }, [viewer, imageId, showMask]);
+  }, [viewer, imageId, showMask, applyStats]);
+
+  // Cancela una vista previa pendiente al desmontar.
+  useEffect(
+    () => () => {
+      if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    },
+    []
+  );
+
+  /** Invalida cualquier vista previa programada o en curso. */
+  const cancelPreview = () => {
+    if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    previewSeqRef.current += 1;
+    setPreviewLoading(false);
+  };
+
+  const requestPreview = useCallback(
+    value => {
+      if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = setTimeout(async () => {
+        const seq = ++previewSeqRef.current;
+        setPreviewLoading(true);
+        setError(null);
+        try {
+          const result = await tissueService.getPreview(imageId, value);
+          if (seq !== previewSeqRef.current) {
+            URL.revokeObjectURL(result.url); // respuesta antigua: se descarta
+            return;
+          }
+          removeOverlay();
+          objectUrlRef.current = result.url;
+          showMask(result.url);
+          setPreview({ tissuePercent: result.tissuePercent });
+        } catch (err) {
+          if (seq === previewSeqRef.current) {
+            setError(err.message || 'Error en la vista previa');
+          }
+        } finally {
+          if (seq === previewSeqRef.current) setPreviewLoading(false);
+        }
+      }, 250);
+    },
+    [imageId, removeOverlay, showMask]
+  );
+
+  const handleFactorChange = value => {
+    setFactor(value);
+    requestPreview(value);
+  };
+
+  const reloadSaved = useCallback(async () => {
+    const [statData, url] = await Promise.all([
+      tissueService.getStats(imageId),
+      tissueService.getMaskObjectUrl(imageId),
+    ]);
+    removeOverlay();
+    applyStats(statData.result_data || null);
+    objectUrlRef.current = url;
+    showMask(url);
+  }, [imageId, removeOverlay, applyStats, showMask]);
+
+  const handleApplyFactor = async () => {
+    cancelPreview();
+    setLoading(true);
+    setError(null);
+    try {
+      await tissueService.analyze(imageId, { thresholdFactor: factor });
+      await reloadSaved();
+    } catch (err) {
+      setError(err.message || 'Error al aplicar el umbral');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDiscardPreview = async () => {
+    cancelPreview();
+    setLoading(true);
+    setError(null);
+    try {
+      await reloadSaved();
+    } catch (err) {
+      setError(err.message || 'Error al restaurar la máscara');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const factorChanged = Math.abs(factor - savedFactor) > 1e-6;
 
   const handleToggle = () => {
     const next = !enabled;
@@ -96,6 +214,9 @@ const TissueMaskControl = forwardRef(({ viewer, imageId }, ref) => {
     if (next) {
       addOverlay();
     } else {
+      cancelPreview();
+      setFactor(savedFactor);
+      setPreview(null);
       removeOverlay();
     }
   };
@@ -142,7 +263,7 @@ const TissueMaskControl = forwardRef(({ viewer, imageId }, ref) => {
         tissueService.getStats(imageId),
         tissueService.getMaskObjectUrl(imageId),
       ]);
-      setStats(statData.result_data || null);
+      applyStats(statData.result_data || null);
       objectUrlRef.current = url;
       showMask(url);
       setEnabled(true);
@@ -193,6 +314,82 @@ const TissueMaskControl = forwardRef(({ viewer, imageId }, ref) => {
           <span className="tissue-opacity-value">
             {Math.round(opacity * 100)}%
           </span>
+        </div>
+      )}
+
+      {enabled && stats && (
+        <div className="tissue-threshold">
+          <div className="tissue-threshold-head">
+            <label htmlFor="tissue-threshold">
+              <SlidersHorizontal size={13} /> Umbral de detección
+            </label>
+            <span className="tissue-threshold-value">
+              ×{factor.toFixed(2)}
+              {Math.abs(factor - 1) < 1e-6 ? ' (automático)' : ''}
+            </span>
+          </div>
+          <input
+            id="tissue-threshold"
+            type="range"
+            min="0.25"
+            max="3"
+            step="0.05"
+            value={factor}
+            onChange={e => handleFactorChange(Number(e.target.value))}
+            disabled={loading}
+          />
+          <div className="tissue-threshold-scale" aria-hidden="true">
+            <span>Más tejido</span>
+            <span>Menos tejido</span>
+          </div>
+          {factorChanged && (
+            <div className="tissue-threshold-preview" role="status">
+              {previewLoading ? (
+                <span>
+                  <Loader2 size={12} className="tissue-spin" /> Calculando vista previa…
+                </span>
+              ) : (
+                <span>
+                  Vista previa:{' '}
+                  <strong>
+                    {preview?.tissuePercent != null
+                      ? `${preview.tissuePercent.toFixed(1)}%`
+                      : '—'}
+                  </strong>{' '}
+                  de tejido (sin guardar)
+                </span>
+              )}
+              <div className="tissue-threshold-actions">
+                <button
+                  type="button"
+                  className="tissue-threshold-discard"
+                  onClick={handleDiscardPreview}
+                  disabled={loading}
+                >
+                  Descartar
+                </button>
+                <button
+                  type="button"
+                  className="tissue-threshold-apply"
+                  onClick={handleApplyFactor}
+                  disabled={loading || previewLoading}
+                  title="Guarda el umbral para esta imagen; también lo usan el mapa de densidad y la clasificación IA"
+                >
+                  Aplicar
+                </button>
+              </div>
+            </div>
+          )}
+          {!factorChanged && Math.abs(savedFactor - 1) > 1e-6 && (
+            <button
+              type="button"
+              className="tissue-threshold-reset"
+              onClick={() => handleFactorChange(1)}
+              disabled={loading}
+            >
+              Volver al umbral automático
+            </button>
+          )}
         </div>
       )}
 

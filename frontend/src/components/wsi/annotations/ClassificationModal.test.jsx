@@ -19,7 +19,7 @@ const baseProps = {
 describe('ClassificationModal', () => {
   it('renderiza el título y el tipo de forma', () => {
     render(<ClassificationModal {...baseProps} />);
-    expect(screen.getByText('Clasificar anotación')).toBeInTheDocument();
+    expect(screen.getByText('Nueva anotación')).toBeInTheDocument();
     expect(screen.getByText(/Rectángulo/i)).toBeInTheDocument();
   });
 
@@ -27,14 +27,39 @@ describe('ClassificationModal', () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     render(<ClassificationModal {...baseProps} onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText('Etiqueta'), { target: { value: 'Mi zona' } });
-    fireEvent.change(screen.getByLabelText('Clasificación'), { target: { value: '10' } });
+    fireEvent.change(screen.getByLabelText('Nombre de la anotación'), { target: { value: 'Mi zona' } });
+    fireEvent.change(screen.getByLabelText('Clasificación (opcional)'), { target: { value: '10' } });
     fireEvent.click(screen.getByText('Guardar'));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ label: 'Mi zona', class_id: 10 })
     );
+  });
+
+  it('guarda una anotación solo con nombre, sin clasificación', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<ClassificationModal {...baseProps} onSubmit={onSubmit} />);
+
+    expect(screen.getByLabelText('Clasificación (opcional)')).toHaveValue('');
+    expect(screen.getByText(/solo con su nombre/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Nombre de la anotación'), {
+      target: { value: 'Zona de interés' },
+    });
+    fireEvent.click(screen.getByText('Guardar'));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ label: 'Zona de interés', class_id: null })
+    );
+  });
+
+  it('exige un nombre o una clasificación', () => {
+    const onSubmit = vi.fn();
+    render(<ClassificationModal {...baseProps} onSubmit={onSubmit} />);
+    fireEvent.click(screen.getByText('Guardar'));
+    expect(screen.getByRole('alert')).toHaveTextContent('Escribe un nombre o elige');
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it('cancela con el botón Cancelar', () => {
@@ -56,8 +81,8 @@ describe('ClassificationModal', () => {
       />
     );
     expect(screen.getByText('Editar anotación')).toBeInTheDocument();
-    expect(screen.getByLabelText('Etiqueta')).toHaveValue('Existente');
-    expect(screen.getByLabelText('Clasificación')).toHaveValue('11');
+    expect(screen.getByLabelText('Nombre de la anotación')).toHaveValue('Existente');
+    expect(screen.getByLabelText('Clasificación (opcional)')).toHaveValue('11');
     expect(screen.getByText('Guardar cambios')).toBeInTheDocument();
   });
 

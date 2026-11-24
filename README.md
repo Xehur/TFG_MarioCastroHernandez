@@ -254,6 +254,9 @@ trivial (`1234`, `postgres`...) o si `CORS_ORIGINS` contiene `*`.
 | `AI_MAX_PATCHES` | 1000 | Máximo de campos con tejido clasificados por análisis |
 | `AI_MIN_TISSUE_FRAC` | 0.35 | Fracción mínima de tejido para analizar una celda |
 | `AI_BATCH_SIZE`, `AI_READ_WORKERS` | 16, 4 | Tamaño de lote e hilos de lectura de la WSI |
+| `AI_ANNOTATION_TARGET_CELLS` | 150 | Posiciones objetivo de la ventana deslizante al clasificar una anotación |
+| `AI_MAX_CELL_DIVISOR` | 6 | Máximo de celdas por lado de campo (paso mínimo = campo / 6) |
+| `AI_ANNOTATION_MAX_PATCHES` | 300 | Máximo de campos clasificados en una anotación |
 
 ### 5.2 Autenticación y permisos
 
@@ -377,6 +380,16 @@ del cristal, el % de tinta excluida, el **nº de fragmentos** (regiones conexas)
 sus áreas. Con la miniatura de 2048 px tarda menos de 1 s. La máscara se convierte
 en un overlay verde semitransparente (`mask_to_rgba_overlay`).
 
+**Umbral ajustable por el usuario.** `detect_tissue(rgb, threshold_factor)` admite
+un factor entre 0,25 y 3 (por defecto 1 = automático) que multiplica el umbral
+fuerte, el débil y el de saturación: menos de 1 detecta más tejido; más de 1,
+menos. `GET /images/{id}/tissue-mask/preview?threshold_factor=` devuelve la
+máscara con ese factor (PNG de 1024 px, con el % de tejido en la cabecera
+`X-Tissue-Percent`) **sin guardarla**, reutilizando una miniatura en memoria
+(≈ 0,2 s). `POST /images/{id}/analyze/tissue?threshold_factor=` lo aplica: el
+factor se guarda con la máscara y lo reutilizan el mapa de densidad, los análisis
+de anotaciones y la clasificación IA, que se recalculan si se obtuvieron con otro.
+
 ### 6.2 Mapa de densidad (`density_generation.py`, `density_service.py`)
 
 1. La imagen se divide en celdas cuadradas de `grid_size` px **de nivel 0** (128,
@@ -422,7 +435,7 @@ aparte":
 | Entrenamiento | *Fine-tuning* desde pesos de ImageNet (`InceptionV3/src/finetune.py`): 30 épocas, Adam (lr 1e-4), lotes de 16, pérdida = principal + 0,3 · auxiliar, aumentos (volteos, rotación ±15°, *color jitter*) |
 | Datos | Fotos del dataset **BACH (ICIAR 2018)** de tejido mamario H&E: 2048 × 1536 px a ≈ 0,42 µm/px |
 | Clases (orden de salida) | `benign`, `insitu`, `invasive`, `normal` (orden alfabético de `ImageFolder`) |
-| Métricas de referencia | Exactitud 0,88 sobre 610 imágenes de validación (`InceptionV3/metricas.txt`); F1: Benign 0,87, InSitu 0,92, Invasive 0,94, Normal 0,76 |
+| Métricas de referencia | Exactitud 0,88 sobre 610 imágenes de validación (`InceptionV3/metricas.txt`); F1: Benign 0,87, InSitu 0,92, Invasive 0,94, Normal 0,76. Sobre WSI anotadas, véase la [sección 7.6](#76-validación-con-wsi-anotadas-de-bach) |
 | Pesos | `InceptionV3/HE_inceptionv3.pth`: `state_dict` puro de 97,8 MB, sin prefijos `module.`. SHA-256 `42515436…394a5e`. **No se versiona en Git** |
 
 **Cuidado al interpretar las métricas.** La división train/val es aleatoria (no por
@@ -481,7 +494,14 @@ aplicarlo a una WSI de gigapíxeles, el servicio la recorre así:
    `ancho = 2048 · 0,42 / mpp`, `alto = 1536 · 0,42 / mpp` (≈ **860 × 645 µm**).
    Así el modelo ve siempre el tejido a la misma escala que en el entrenamiento,
    tanto en la imagen completa como en una región anotada.
-3. **Rejilla densa.** La región se divide en celdas del tamaño exacto del campo.
+3. **Rejilla densa.** En la imagen completa, la región se divide en celdas del
+   tamaño exacto del campo. En una **anotación** se usa una **ventana
+   deslizante**: las celdas miden campo / *d* (`adaptive_cell_divisor`, con *d*
+   entre 1 y `AI_MAX_CELL_DIVISOR` para acercarse a `AI_ANNOTATION_TARGET_CELLS`
+   posiciones) y cada una se clasifica con un campo completo centrado en ella.
+   Los campos se solapan, pero el modelo sigue viendo la escala del
+   entrenamiento, y una región con varios tejidos ya no se resuelve con una sola
+   predicción. El resultado guarda `cell_divisor` y `cell_um`.
 4. **Selección de celdas con tejido.** Se clasifican las celdas con al menos un
    35 % de tejido (`AI_MIN_TISSUE_FRAC`). El campo de cada una **se centra en el
    centroide de su tejido**, no en el centro geométrico, para que en los bordes del
@@ -498,8 +518,11 @@ aplicarlo a una WSI de gigapíxeles, el servicio la recorre así:
    (bordes con poco tejido o celdas no muestreadas) toman la clase del campo
    analizado **más cercano** (transformada de distancia de SciPy). No cuentan en
    las estadísticas.
-8. **Overlay.** Cada celda se pinta con el color de su clase: opacidad 140 si la
-   evaluó el modelo y 80 si se rellenó por vecindad. El color se **recorta a la
+8. **Overlay.** Cada celda se pinta con el color de su clase con opacidad 140. Las
+   celdas del **borde** rellenadas por vecindad usan la misma opacidad, para que
+   el contorno tenga el color de su clase; solo las celdas con tejido suficiente
+   que quedaron fuera del **muestreo** se pintan más claras (opacidad 80,
+   `sampling.attenuated_cells`). El color se **recorta a la
    máscara de tejido**, así que sigue el contorno del tejido, lo cubre al 100 % y
    no se pinta sobre el cristal.
 9. **Resumen y persistencia.** Se calculan los recuentos por clase, porcentajes,
@@ -531,6 +554,7 @@ campos de tejido se clasifica en ≈ 11 s; una de 36 000 × 17 000 px, en ≈ 3 
 | `sampling` | Celdas con tejido, analizadas e inferidas, cobertura, si hubo muestreo, tamaño del campo (px y µm), µm/px y su origen, y si el campo es mayor que la región anotada |
 | `legend`, `background`, `disclaimer` | Leyenda, etiqueta de fondo y aviso de uso no diagnóstico |
 | `tissue_detector_version` | Versión del detector de tejido usada (para invalidar la caché) |
+| `classification_version`, `tissue_threshold_factor` | Versión del procedimiento de clasificación (`fields-v2`) y umbral de tejido usado; si no coinciden con los actuales, se recalcula |
 
 Los porcentajes son **de campos evaluados**, no de superficie exacta.
 
@@ -549,10 +573,32 @@ torchvision. Con `--images` sobre carpetas `Benign/ InSitu/ Invasive/ Normal/` m
 la exactitud con `transform_input=True` y `False`, para confirmar el ajuste correcto
 con datos etiquetados.
 
-### 7.6 Limitaciones de la IA
+### 7.6 Validación con WSI anotadas de BACH
+
+`scripts/validar_ia_bach.py` (desde `backend/`) mide la exactitud sobre las WSI de
+la parte B de BACH, cuyas regiones fueron delimitadas por patólogos. Descarga cada
+WSI y su XML (si no están ya en `--datos`), clasifica cada región **igual que una
+anotación de la aplicación** (ventana deslizante) y, con `--normal N`, añade N
+recuadros de tejido sin anotar por WSI como referencia aproximada de «Normal».
+
+```bash
+python scripts/validar_ia_bach.py --wsi A03 A07 A05 A09 A10 A06 --normal 10 \
+    --datos ../datos_bach --salida ../docs/evaluacion/validacion_ia_bach
+```
+
+Genera matrices de confusión y métricas por clase a nivel de región (clase
+mayoritaria) y de posición en `docs/evaluacion/validacion_ia_bach.md` y `.json`.
+Resultado con 6 WSI (43 regiones): **67,4 %** de exactitud por región; sensibilidad
+para carcinoma del 85,7 % y especificidad del 59,1 %. Solo 24 de 60 recuadros sin
+anotar salen «Normal» y 28 salen «Invasivo». `datos_bach/` (≈ 1,2 GB) está en
+`.gitignore` y puede borrarse tras la ejecución.
+
+### 7.7 Limitaciones de la IA
 
 - El modelo se entrenó con **fotos** de BACH, no con WSI; la equivalencia de escala
-  (≈ 0,42 µm/px) es una aproximación razonable, no una validación.
+  (≈ 0,42 µm/px) es una aproximación razonable.
+- **Sobredetección de carcinoma invasivo** en tejido no tumoral y bajo
+  reconocimiento de lesiones benignas en la validación sobre WSI (sección 7.6).
 - Cada campo cubre ≈ 0,56 mm²: el mapa tiene resolución de "campo", no celular.
 - En anotaciones más pequeñas que un campo, el campo incluye contexto exterior a la
   región (`sampling.field_exceeds_region = true`).
@@ -710,7 +756,8 @@ Todos los endpoints salvo salud, raíz, registro y login exigen
 | Método | Ruta | Devuelve |
 |---|---|---|
 | GET | `/images/{id}/tissue-mask` · `/tissue-mask/stats` | PNG de la máscara · métricas JSON |
-| POST | `/images/{id}/analyze/tissue` | Fuerza la detección de tejido |
+| GET | `/images/{id}/tissue-mask/preview?threshold_factor=` | Vista previa de la máscara con otro umbral (PNG, sin guardar; `X-Tissue-Percent`) |
+| POST | `/images/{id}/analyze/tissue` | Fuerza la detección de tejido (con `threshold_factor` opcional, lo guarda) |
 | GET | `/images/{id}/density-map` · `/density-map/stats` | PNG del heatmap · métricas (`grid_size`, `colormap`) |
 | POST | `/images/{id}/analyze/density` | Fuerza el mapa de densidad |
 | POST / GET | `/images/{id}/analyze` · `/images/{id}/analysis` | Análisis consolidado: ejecutar · consultar |
@@ -737,7 +784,7 @@ Los `GET` de análisis aceptan `force=true` para recalcular.
 | Slides abiertos y tiles JPEG | Memoria (LRU: 8 slides, 2048 tiles) | Se expulsan por uso o al borrar la imagen |
 | Máscara de tejido | `uploads/analysis/<img>/` + `analysis_results` | Si cambia `DETECTOR_VERSION` o falta el PNG |
 | Mapa de densidad | Mismo directorio + `density_maps` (por `grid_size` y `colormap`) | Si cambia `DETECTOR_VERSION` o falta el PNG |
-| Clasificación IA | `…/ai_classification.png` + `analysis_results` | Si cambia el id del modelo, la versión de preprocesado o la del detector de tejido |
+| Clasificación IA | `…/ai_classification.png` + `analysis_results` | Si cambia el id del modelo, la versión de preprocesado, la del detector de tejido, la del procedimiento de clasificación o el umbral de tejido |
 | Resultados por anotación | `uploads/analysis/<img>/ann_<id>/` | Igual que los de imagen |
 
 Gracias a este versionado, los resultados antiguos (por ejemplo, del clasificador
@@ -761,13 +808,13 @@ cd frontend
 npm test
 ```
 
-- **Backend (pytest, ~230 tests)**: una batería por dominio (auth, imágenes, subida
+- **Backend (pytest, 259 tests)**: una batería por dominio (auth, imágenes, subida
   múltiple, anotaciones, COCO, tejido, densidad, análisis por anotación, IA,
   analíticas, comandos, tiles…). Usan **SQLite** y sustituyen `OpenSlideService` y
   el clasificador por objetos falsos, así que no necesitan WSI reales ni el modelo.
   La excepción es un test que, **si existe el checkpoint**, carga el modelo real y
   comprueba que su salida es `(N, 4)` y válida.
-- **Frontend (Vitest + Testing Library, ~150 tests)**: servicios de API y
+- **Frontend (Vitest + Testing Library, 165 tests)**: servicios de API y
   componentes clave (controles de análisis, dashboard, paleta, modales, hooks de
   anotación). Recharts se sustituye por *stubs*.
 

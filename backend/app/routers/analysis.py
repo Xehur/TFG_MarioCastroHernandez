@@ -4,7 +4,9 @@ Router para análisis de imagen (Sprint 6).
 Endpoints:
 - GET /images/{image_id}/tissue-mask         PNG de la máscara de tejido (overlay)
 - GET /images/{image_id}/tissue-mask/stats   estadísticas del análisis (JSON)
+- GET /images/{image_id}/tissue-mask/preview vista previa con un factor de umbral
 - POST /images/{image_id}/analyze/tissue     fuerza el (re)análisis de tejido
+                                             (opcional: ?threshold_factor=)
 - GET /images/{image_id}/density-map         PNG del heatmap de densidad
 - GET /images/{image_id}/density-map/stats   matriz de densidad + metadatos (JSON)
 - POST /images/{image_id}/analyze/density    fuerza la (re)generación del mapa
@@ -14,7 +16,9 @@ Endpoints:
 """
 import os
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
@@ -39,6 +43,11 @@ from app.services.analysis import (
 from app.services.analysis.density_generation import (
     SUPPORTED_COLORMAPS,
     DEFAULT_COLORMAP,
+)
+from app.services.analysis.tissue_detection import (
+    DEFAULT_THRESHOLD_FACTOR,
+    MIN_THRESHOLD_FACTOR,
+    MAX_THRESHOLD_FACTOR,
 )
 
 logger = logging.getLogger(__name__)
@@ -107,6 +116,42 @@ def get_tissue_mask(
     )
 
 
+@router.get("/images/{image_id}/tissue-mask/preview")
+def preview_tissue_mask(
+    image_id: int,
+    threshold_factor: float = Query(
+        default=DEFAULT_THRESHOLD_FACTOR, ge=MIN_THRESHOLD_FACTOR, le=MAX_THRESHOLD_FACTOR
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Vista previa de la máscara con un factor de umbral, sin guardarla.
+
+    Devuelve el PNG y, en cabeceras, el porcentaje de tejido resultante
+    (``X-Tissue-Percent``) para mostrarlo junto al deslizador.
+    """
+    image = _get_image_or_404(db, image_id)
+    _ensure_file_exists(image)
+    try:
+        png_bytes, stats = tissue_service.preview_tissue_mask(
+            image.file_path, threshold_factor
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"Error en la vista previa de tejido: {exc}")
+        raise HTTPException(
+            status_code=500, detail=f"Error en la vista previa de tejido: {exc}"
+        )
+    return Response(
+        content=png_bytes,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "no-store",
+            "X-Tissue-Percent": f"{stats['tissue_percent']:.2f}",
+            "X-Threshold-Factor": f"{stats['threshold_factor']:.3f}",
+        },
+    )
+
+
 @router.get(
     "/images/{image_id}/tissue-mask/stats",
     response_model=AnalysisResultResponse,
@@ -140,16 +185,23 @@ def get_tissue_mask_stats(
 )
 def analyze_tissue(
     image_id: int,
+    threshold_factor: Optional[float] = Query(
+        default=None, ge=MIN_THRESHOLD_FACTOR, le=MAX_THRESHOLD_FACTOR
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Fuerza el (re)análisis de tejido y devuelve las estadísticas."""
+    """Fuerza el (re)análisis de tejido y devuelve las estadísticas.
+
+    Con ``threshold_factor`` se aplica (y se guarda para la imagen) un factor
+    de umbral elegido por el usuario; sin él se conserva el actual.
+    """
     image = _get_image_or_404(db, image_id)
     _ensure_file_exists(image)
 
     try:
         analysis = tissue_service.generate_tissue_mask(
-            db, image_id, image.file_path
+            db, image_id, image.file_path, threshold_factor=threshold_factor
         )
     except Exception as exc:  # noqa: BLE001
         logger.error(f"Error en análisis de tejido: {exc}")

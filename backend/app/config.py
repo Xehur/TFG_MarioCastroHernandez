@@ -84,6 +84,12 @@ class Settings(BaseSettings):
     AI_MIN_TISSUE_FRAC: float = 0.35
     AI_BATCH_SIZE: int = 16
     AI_READ_WORKERS: int = 4  # hilos de lectura de campos de la WSI
+    # Anotaciones: ventana deslizante con celdas más pequeñas que el campo para
+    # localizar varios tipos de tejido dentro de la región (~celdas objetivo,
+    # divisor máximo del campo y tope de campos clasificados).
+    AI_ANNOTATION_TARGET_CELLS: int = 150
+    AI_MAX_CELL_DIVISOR: int = 6
+    AI_ANNOTATION_MAX_PATCHES: int = 300
 
     class Config:
         env_file = ".env"

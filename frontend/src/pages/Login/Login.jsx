@@ -26,9 +26,8 @@ const Login = () => {
       await login({ email, password });
       navigate(from, { replace: true });
     } catch (err) {
-      const detail =
-        err.response?.data?.detail || 'No se pudo iniciar sesión. Revisa tus credenciales.';
-      setError(typeof detail === 'string' ? detail : 'Error de autenticación.');
+      // El interceptor de api.js entrega un ApiError con el motivo ya legible.
+      setError(err?.message || 'No se pudo iniciar sesión. Revisa tus credenciales.');
     } finally {
       setSubmitting(false);
     }

@@ -55,7 +55,9 @@ def execute_command(
 ):
     """Ejecuta un comando de servidor y devuelve su resultado."""
     try:
-        return command_executor.execute(db, payload.command_id, payload.params)
+        return command_executor.execute(
+            db, payload.command_id, payload.params, user_id=current_user.id
+        )
     except command_executor.CommandError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.message)
     except Exception as exc:  # noqa: BLE001

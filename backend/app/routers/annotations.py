@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_db, get_current_user
+from app.core.access import get_owned_image_or_404
 from app.models.user import User
 from app.models.image import Image
 from app.models.annotation import Annotation, AnnotationClass
@@ -103,9 +104,7 @@ def create_annotation(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    image = db.query(Image).filter(Image.id == image_id).first()
-    if image is None:
-        raise HTTPException(status_code=404, detail="Imagen no encontrada")
+    get_owned_image_or_404(db, image_id, current_user)
 
     if payload.class_id is not None:
         _get_owned_class_or_404(db, payload.class_id, current_user)
@@ -136,9 +135,7 @@ def list_annotations(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    image = db.query(Image).filter(Image.id == image_id).first()
-    if image is None:
-        raise HTTPException(status_code=404, detail="Imagen no encontrada")
+    get_owned_image_or_404(db, image_id, current_user)
 
     query = db.query(Annotation).filter(Annotation.image_id == image_id)
     total = query.count()

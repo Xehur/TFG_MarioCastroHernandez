@@ -62,15 +62,54 @@ preparar_env() {
             if ($0 ~ "^[ \t]*DB_PASSWORD[ \t]*=[ \t]*(" ph ")?[ \t]*$") print "DB_PASSWORD=" v; else print
         }' .env > .env.tmp && mv .env.tmp .env
         cambios="$cambios DB_PASSWORD"
-        if docker volume ls -q --filter name=docker_db_data 2>/dev/null | grep -q .; then
-            aviso "Ya existe una base de datos de una instalación anterior (volumen docker_db_data) creada con otra contraseña. PostgreSQL mantendrá la antigua: restaura tu .env anterior o bórrala con 'docker compose down -v' (se pierden los datos)."
-        fi
+        CONTRASENA_BD_NUEVA=1
     fi
     if [ -n "$cambios" ]; then
         echo "    Generados valores aleatorios para:$cambios"
     elif [ "$nuevo" -eq 0 ]; then
         echo "    docker/.env ya está configurado."
     fi
+}
+
+fijar_valor_env() {
+    awk -v k="$1" -v v="$2" '{ if ($0 ~ "^[ \t]*" k "[ \t]*=") print k "=" v; else print }' .env > .env.tmp && mv .env.tmp .env
+}
+
+# PostgreSQL solo fija la contraseña al crear la base de datos. Si se acaba de
+# generar una DB_PASSWORD nueva pero ya existe el volumen de una instalación
+# anterior (los volúmenes se llaman como la carpeta "docker", así que lo comparten
+# todas las copias del proyecto), el backend no podría conectarse. Se pregunta
+# qué hacer en lugar de arrancar con una configuración que va a fallar.
+comprobar_bd_anterior() {
+    [ "${CONTRASENA_BD_NUEVA:-0}" = 1 ] || return 0
+    docker volume ls -q --filter name=docker_db_data 2>/dev/null | grep -qx docker_db_data || return 0
+    echo
+    aviso "Ya existe una base de datos de una instalación anterior (volumen docker_db_data), creada con otra contraseña. Con la contraseña recién generada el backend no podría conectarse."
+    if [ ! -t 0 ]; then
+        echo "Copia en docker/.env el DB_PASSWORD de la instalación anterior, o borra la base de datos antigua con 'docker compose down -v' (se pierden sus datos), y vuelve a ejecutar el script." >&2
+        exit 1
+    fi
+    echo "  1) Escribir la contraseña anterior (conserva usuarios, imágenes y anotaciones)"
+    echo "  2) Borrar la base de datos y las imágenes anteriores y empezar de cero"
+    echo "  3) Cancelar"
+    printf "Opción [1]: "
+    read -r OPCION_BD
+    case "$OPCION_BD" in
+        2)
+            paso "Borrando los datos de la instalación anterior"
+            docker compose down -v
+            ;;
+        3)
+            exit 1
+            ;;
+        *)
+            printf "DB_PASSWORD anterior (está en el docker/.env de la otra instalación): "
+            read -r PWD_ANTERIOR
+            [ -n "$PWD_ANTERIOR" ] || { echo "No se ha indicado ninguna contraseña." >&2; exit 1; }
+            fijar_valor_env DB_PASSWORD "$PWD_ANTERIOR"
+            echo "    DB_PASSWORD actualizada en docker/.env."
+            ;;
+    esac
 }
 
 descargar() {
@@ -120,6 +159,7 @@ fi
 
 # --- 1. Configuración y 2. pesos --------------------------------------------
 preparar_env
+comprobar_bd_anterior
 preparar_pesos
 
 # --- 3. CPU o GPU -----------------------------------------------------------

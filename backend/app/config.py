@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     # Información de la aplicación
     APP_NAME: str = "WSI Visualization API"
-    APP_VERSION: str = "1.1.0"
+    APP_VERSION: str = "1.1.1"
     APP_DESCRIPTION: str = "API para visualización de imágenes WSI con IA"
 
     # Ambiente

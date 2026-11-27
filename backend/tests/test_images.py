@@ -94,7 +94,7 @@ def test_delete_image_not_found(client):
 
 
 def test_delete_image_forbidden(client, test_db):
-    """No se puede eliminar una imagen de otro usuario (403)."""
+    """No se puede eliminar una imagen de otro usuario: 404, como si no existiera."""
     from app.models.image import Image
 
     other = Image(
@@ -113,7 +113,7 @@ def test_delete_image_forbidden(client, test_db):
     test_db.refresh(other)
 
     response = client.delete(f"/images/{other.id}")
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 def test_delete_image_requires_auth(anon_client):

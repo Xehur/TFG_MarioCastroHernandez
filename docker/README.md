@@ -190,9 +190,14 @@ Se definen en el archivo `.env` de esta carpeta (ver `.env.example`):
   Para usar otra ubicacion, define `INCEPTION_WEIGHTS_URL` en `.env` (o como
   variable de entorno). Para que la descarga funcione, el repositorio debe ser
   publico y el release debe llevar adjunto `HE_inceptionv3.pth`.
-- **Si borras `.env` con una base de datos ya creada**: el script genera una
-  contraseña nueva, pero PostgreSQL conserva la del primer arranque (el script
-  avisa). Restaura el `.env` anterior o borra los datos con `docker compose down -v`.
+- **Si borras `.env` o instalas otra copia del proyecto con una base de datos ya
+  creada**: los volumenes se llaman como la carpeta `docker` (`docker_db_data`),
+  asi que todas las copias comparten la misma base de datos, y PostgreSQL conserva
+  la contraseña del primer arranque. Si el script genera una contraseña nueva y
+  encuentra ese volumen, pregunta si escribir la contraseña anterior (se
+  conservan los datos) o borrar la base de datos y empezar de cero. Si aun asi el
+  backend no conecta, su log lo indica en una linea («PostgreSQL rechaza la
+  contraseña») en lugar de reiniciarse con trazas largas.
 - **CORS**: el contenedor arranca en modo produccion, que solo admite los
   origenes de `CORS_ORIGINS`. Si sirves el frontend desde otra IP o dominio,
   añadelo ahi.

@@ -23,6 +23,10 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_db, get_current_user
+from app.core.access import (
+    get_annotation_on_owned_image_or_404,
+    get_owned_image_or_404,
+)
 from app.models.user import User
 from app.models.image import Image
 from app.models.annotation import Annotation
@@ -55,11 +59,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["analysis"])
 
 
-def _get_image_or_404(db: Session, image_id: int) -> Image:
-    image = db.query(Image).filter(Image.id == image_id).first()
-    if image is None:
-        raise HTTPException(status_code=404, detail="Imagen no encontrada")
-    return image
+def _get_image_or_404(db: Session, image_id: int, user: User) -> Image:
+    """Imagen del usuario autenticado; 404 si no existe o es de otro usuario."""
+    return get_owned_image_or_404(db, image_id, user)
 
 
 def _ensure_file_exists(image: Image) -> None:
@@ -69,14 +71,10 @@ def _ensure_file_exists(image: Image) -> None:
         )
 
 
-def _get_annotation_ctx(db: Session, annotation_id: int):
-    """Devuelve (annotation, image) validando existencia y archivo."""
-    annotation = (
-        db.query(Annotation).filter(Annotation.id == annotation_id).first()
-    )
-    if annotation is None:
-        raise HTTPException(status_code=404, detail="Anotación no encontrada")
-    image = _get_image_or_404(db, annotation.image_id)
+def _get_annotation_ctx(db: Session, annotation_id: int, user: User):
+    """Devuelve (annotation, image) validando propietario, existencia y archivo."""
+    annotation = get_annotation_on_owned_image_or_404(db, annotation_id, user)
+    image = _get_image_or_404(db, annotation.image_id, user)
     _ensure_file_exists(image)
     return annotation, image
 
@@ -89,7 +87,7 @@ def get_tissue_mask(
     current_user: User = Depends(get_current_user),
 ):
     """Devuelve el PNG (RGBA) de la máscara de tejido. Lo genera si no existe."""
-    image = _get_image_or_404(db, image_id)
+    image = _get_image_or_404(db, image_id, current_user)
     _ensure_file_exists(image)
 
     try:
@@ -130,7 +128,7 @@ def preview_tissue_mask(
     Devuelve el PNG y, en cabeceras, el porcentaje de tejido resultante
     (``X-Tissue-Percent``) para mostrarlo junto al deslizador.
     """
-    image = _get_image_or_404(db, image_id)
+    image = _get_image_or_404(db, image_id, current_user)
     _ensure_file_exists(image)
     try:
         png_bytes, stats = tissue_service.preview_tissue_mask(
@@ -163,7 +161,7 @@ def get_tissue_mask_stats(
     current_user: User = Depends(get_current_user),
 ):
     """Devuelve las estadísticas del análisis de tejido (JSON)."""
-    image = _get_image_or_404(db, image_id)
+    image = _get_image_or_404(db, image_id, current_user)
     _ensure_file_exists(image)
 
     try:
@@ -196,7 +194,7 @@ def analyze_tissue(
     Con ``threshold_factor`` se aplica (y se guarda para la imagen) un factor
     de umbral elegido por el usuario; sin él se conserva el actual.
     """
-    image = _get_image_or_404(db, image_id)
+    image = _get_image_or_404(db, image_id, current_user)
     _ensure_file_exists(image)
 
     try:
@@ -245,7 +243,7 @@ def get_density_map(
 ):
     """Devuelve el PNG (RGBA) del heatmap de densidad. Lo genera si no existe."""
     _validate_density_params(grid_size, colormap)
-    image = _get_image_or_404(db, image_id)
+    image = _get_image_or_404(db, image_id, current_user)
     _ensure_file_exists(image)
 
     try:
@@ -286,7 +284,7 @@ def get_density_map_stats(
 ):
     """Devuelve la matriz de densidades y sus metadatos (JSON)."""
     _validate_density_params(grid_size, colormap)
-    image = _get_image_or_404(db, image_id)
+    image = _get_image_or_404(db, image_id, current_user)
     _ensure_file_exists(image)
 
     try:
@@ -315,7 +313,7 @@ def analyze_density(
 ):
     """Fuerza la (re)generación del mapa de densidades y devuelve los datos."""
     _validate_density_params(grid_size, colormap)
-    image = _get_image_or_404(db, image_id)
+    image = _get_image_or_404(db, image_id, current_user)
     _ensure_file_exists(image)
 
     try:
@@ -346,7 +344,7 @@ def analyze_image(
 ):
     """Ejecuta el análisis completo (tejido + densidad) y guarda el resumen."""
     _validate_density_params(grid_size, colormap)
-    image = _get_image_or_404(db, image_id)
+    image = _get_image_or_404(db, image_id, current_user)
     _ensure_file_exists(image)
 
     try:
@@ -371,7 +369,7 @@ def get_analysis(
     current_user: User = Depends(get_current_user),
 ):
     """Devuelve el último análisis consolidado de la imagen (404 si no existe)."""
-    _get_image_or_404(db, image_id)
+    _get_image_or_404(db, image_id, current_user)
     analysis = analysis_service.get_full_analysis(db, image_id)
     if analysis is None:
         raise HTTPException(
@@ -397,7 +395,7 @@ def get_analytics(
         raise HTTPException(
             status_code=422, detail="spatial_bins debe estar entre 2 y 100"
         )
-    image = _get_image_or_404(db, image_id)
+    image = _get_image_or_404(db, image_id, current_user)
     try:
         return analytics_service.build_analytics(
             db,
@@ -424,7 +422,7 @@ def get_annotation_tissue_mask(
     current_user: User = Depends(get_current_user),
 ):
     """PNG (RGBA) de la máscara de tejido de la región de la anotación."""
-    annotation, image = _get_annotation_ctx(db, annotation_id)
+    annotation, image = _get_annotation_ctx(db, annotation_id, current_user)
     try:
         analysis = annotation_analysis_service.get_or_create_tissue_mask(
             db, annotation, image.file_path, force=force
@@ -459,7 +457,7 @@ def get_annotation_tissue_stats(
     current_user: User = Depends(get_current_user),
 ):
     """Estadísticas del análisis de tejido de la anotación (JSON)."""
-    annotation, image = _get_annotation_ctx(db, annotation_id)
+    annotation, image = _get_annotation_ctx(db, annotation_id, current_user)
     try:
         return annotation_analysis_service.get_or_create_tissue_mask(
             db, annotation, image.file_path, force=force
@@ -482,7 +480,7 @@ def analyze_annotation_tissue(
     current_user: User = Depends(get_current_user),
 ):
     """Fuerza el (re)análisis de tejido de la región anotada."""
-    annotation, image = _get_annotation_ctx(db, annotation_id)
+    annotation, image = _get_annotation_ctx(db, annotation_id, current_user)
     try:
         return annotation_analysis_service.generate_tissue_mask(
             db, annotation, image.file_path
@@ -505,7 +503,7 @@ def get_annotation_density_map(
 ):
     """PNG (RGBA) del heatmap de densidad de la región de la anotación."""
     _validate_density_params(grid_size, colormap)
-    annotation, image = _get_annotation_ctx(db, annotation_id)
+    annotation, image = _get_annotation_ctx(db, annotation_id, current_user)
     try:
         density_map = annotation_analysis_service.get_or_create_density(
             db, annotation, image.file_path, grid_size, colormap, force=force
@@ -547,7 +545,7 @@ def get_annotation_density_stats(
 ):
     """Matriz de densidades y metadatos de la anotación (JSON)."""
     _validate_density_params(grid_size, colormap)
-    annotation, image = _get_annotation_ctx(db, annotation_id)
+    annotation, image = _get_annotation_ctx(db, annotation_id, current_user)
     try:
         return annotation_analysis_service.get_or_create_density(
             db, annotation, image.file_path, grid_size, colormap, force=force
@@ -573,7 +571,7 @@ def analyze_annotation_density(
 ):
     """Fuerza la (re)generación del mapa de densidades de la anotación."""
     _validate_density_params(grid_size, colormap)
-    annotation, image = _get_annotation_ctx(db, annotation_id)
+    annotation, image = _get_annotation_ctx(db, annotation_id, current_user)
     try:
         return annotation_analysis_service.generate_density(
             db, annotation, image.file_path, grid_size, colormap
@@ -599,7 +597,7 @@ def analyze_annotation(
 ):
     """Análisis completo (tejido + densidad) de la región anotada."""
     _validate_density_params(grid_size, colormap)
-    annotation, image = _get_annotation_ctx(db, annotation_id)
+    annotation, image = _get_annotation_ctx(db, annotation_id, current_user)
     try:
         return annotation_analysis_service.run_full_analysis(
             db, annotation, image.file_path, grid_size, colormap
@@ -621,11 +619,9 @@ def get_annotation_analysis(
     current_user: User = Depends(get_current_user),
 ):
     """Último análisis consolidado de la anotación (404 si no existe)."""
-    annotation = (
-        db.query(Annotation).filter(Annotation.id == annotation_id).first()
+    annotation = get_annotation_on_owned_image_or_404(
+        db, annotation_id, current_user
     )
-    if annotation is None:
-        raise HTTPException(status_code=404, detail="Anotación no encontrada")
     analysis = annotation_analysis_service.get_full_analysis(db, annotation_id)
     if analysis is None:
         raise HTTPException(
@@ -649,11 +645,9 @@ def get_annotation_analytics(
         raise HTTPException(
             status_code=422, detail="spatial_bins debe estar entre 2 y 100"
         )
-    annotation = (
-        db.query(Annotation).filter(Annotation.id == annotation_id).first()
+    annotation = get_annotation_on_owned_image_or_404(
+        db, annotation_id, current_user
     )
-    if annotation is None:
-        raise HTTPException(status_code=404, detail="Anotación no encontrada")
     try:
         return annotation_analysis_service.build_annotation_analytics(
             db, annotation, spatial_bins=spatial_bins
@@ -676,7 +670,7 @@ def get_image_ai_classification(
     current_user: User = Depends(get_current_user),
 ):
     """PNG (RGBA) del mapa de clases IA de la imagen. Lo genera si no existe."""
-    image = _get_image_or_404(db, image_id)
+    image = _get_image_or_404(db, image_id, current_user)
     _ensure_file_exists(image)
     try:
         analysis = ai_classification_service.get_or_create_image_classification(
@@ -714,7 +708,7 @@ def get_image_ai_classification_stats(
     current_user: User = Depends(get_current_user),
 ):
     """Estadísticas de la clasificación IA de la imagen (JSON)."""
-    image = _get_image_or_404(db, image_id)
+    image = _get_image_or_404(db, image_id, current_user)
     _ensure_file_exists(image)
     try:
         return ai_classification_service.get_or_create_image_classification(
@@ -741,7 +735,7 @@ def analyze_image_ai(
     current_user: User = Depends(get_current_user),
 ):
     """Fuerza la (re)ejecución de la clasificación IA de la imagen."""
-    image = _get_image_or_404(db, image_id)
+    image = _get_image_or_404(db, image_id, current_user)
     _ensure_file_exists(image)
     try:
         return ai_classification_service.generate_image_classification(
@@ -765,7 +759,7 @@ def get_annotation_ai_classification(
     current_user: User = Depends(get_current_user),
 ):
     """PNG (RGBA) del mapa de clases IA de la región anotada."""
-    annotation, image = _get_annotation_ctx(db, annotation_id)
+    annotation, image = _get_annotation_ctx(db, annotation_id, current_user)
     try:
         analysis = ai_classification_service.get_or_create_annotation_classification(
             db, annotation, image.file_path, force=force
@@ -802,7 +796,7 @@ def get_annotation_ai_classification_stats(
     current_user: User = Depends(get_current_user),
 ):
     """Estadísticas de la clasificación IA de la anotación (JSON)."""
-    annotation, image = _get_annotation_ctx(db, annotation_id)
+    annotation, image = _get_annotation_ctx(db, annotation_id, current_user)
     try:
         return ai_classification_service.get_or_create_annotation_classification(
             db, annotation, image.file_path, force=force
@@ -828,7 +822,7 @@ def analyze_annotation_ai(
     current_user: User = Depends(get_current_user),
 ):
     """Fuerza la (re)ejecución de la clasificación IA de la región anotada."""
-    annotation, image = _get_annotation_ctx(db, annotation_id)
+    annotation, image = _get_annotation_ctx(db, annotation_id, current_user)
     try:
         return ai_classification_service.generate_annotation_classification(
             db, annotation, image.file_path

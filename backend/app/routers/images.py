@@ -20,6 +20,7 @@ from app.schemas.image import ImageResponse, ImageUploadResult, MultipleUploadRe
 from app.services.wsi.openslide_service import OpenSlideService
 from app.services.wsi.slide_cache import slide_cache
 from app.core.deps import get_current_user
+from app.core.access import get_owned_image_or_404
 
 router = APIRouter(
     prefix="/images",
@@ -242,12 +243,9 @@ async def get_image(
     Returns:
         Información de la imagen
     """
-    image = db.query(Image).filter(Image.id == image_id).first()
-    if not image:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Imagen con ID {image_id} no encontrada"
-        )
+    image = get_owned_image_or_404(
+        db, image_id, current_user, detail=f"Imagen con ID {image_id} no encontrada"
+    )
     return image
 
 
@@ -272,18 +270,9 @@ async def delete_image(
     Returns:
         Mensaje de confirmación
     """
-    image = db.query(Image).filter(Image.id == image_id).first()
-    if not image:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Imagen con ID {image_id} no encontrada"
-        )
-
-    if image.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permiso para eliminar esta imagen"
-        )
+    image = get_owned_image_or_404(
+        db, image_id, current_user, detail=f"Imagen con ID {image_id} no encontrada"
+    )
 
     file_path = image.file_path
 
@@ -499,12 +488,9 @@ async def get_dzi_metadata(
     Returns:
         XML con configuración DZI
     """
-    image = db.query(Image).filter(Image.id == image_id).first()
-    if not image:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Imagen con ID {image_id} no encontrada"
-        )
+    image = get_owned_image_or_404(
+        db, image_id, current_user, detail=f"Imagen con ID {image_id} no encontrada"
+    )
 
     # Verificar que el archivo existe
     if not os.path.exists(image.file_path):
@@ -557,12 +543,9 @@ async def get_tile(
     Returns:
         Imagen JPEG del tile
     """
-    image = db.query(Image).filter(Image.id == image_id).first()
-    if not image:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Imagen con ID {image_id} no encontrada"
-        )
+    image = get_owned_image_or_404(
+        db, image_id, current_user, detail=f"Imagen con ID {image_id} no encontrada"
+    )
 
     if not os.path.exists(image.file_path):
         raise HTTPException(

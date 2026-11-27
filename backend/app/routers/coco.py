@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_db, get_current_user
+from app.core.access import get_owned_image_or_404
 from app.models.user import User
 from app.models.image import Image
 from app.models.annotation import Annotation, AnnotationClass
@@ -22,11 +23,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["coco"])
 
 
-def _get_image_or_404(db: Session, image_id: int) -> Image:
-    image = db.query(Image).filter(Image.id == image_id).first()
-    if image is None:
-        raise HTTPException(status_code=404, detail="Imagen no encontrada")
-    return image
+def _get_image_or_404(db: Session, image_id: int, user: User) -> Image:
+    """Imagen del usuario autenticado; 404 si no existe o es de otro usuario."""
+    return get_owned_image_or_404(db, image_id, user)
 
 
 @router.get("/images/{image_id}/export/coco")
@@ -36,7 +35,7 @@ def export_coco(
     current_user: User = Depends(get_current_user),
 ):
     """Exporta las anotaciones de una imagen en formato COCO JSON."""
-    image = _get_image_or_404(db, image_id)
+    image = _get_image_or_404(db, image_id, current_user)
 
     annotations = (
         db.query(Annotation)
@@ -75,7 +74,7 @@ def import_coco(
     current_user: User = Depends(get_current_user),
 ):
     """Importa anotaciones desde un documento COCO a una imagen."""
-    image = _get_image_or_404(db, image_id)
+    image = _get_image_or_404(db, image_id, current_user)
 
     try:
         coco_service.validate_coco(payload.coco)

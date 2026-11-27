@@ -85,16 +85,50 @@ function Preparar-Env {
     }
     if ($cambios.Count -gt 0) {
         Write-Host "    Generados valores aleatorios para: $($cambios -join ', ')"
-        if ($cambios -contains 'DB_PASSWORD') {
-            $volumen = (Invocar-Silencioso { docker volume ls -q --filter 'name=docker_db_data' }).Salida
-            if ($volumen) {
-                Escribir-Aviso ('Ya existe una base de datos de una instalación anterior (volumen ' +
-                    'docker_db_data) creada con otra contraseña. PostgreSQL mantendrá la antigua: ' +
-                    'restaura tu .env anterior o bórrala con "docker compose down -v" (se pierden los datos).')
-            }
-        }
     } elseif (-not $nuevo) {
         Write-Host '    docker/.env ya está configurado.'
+    }
+    return ($cambios -contains 'DB_PASSWORD')
+}
+
+function Fijar-ValorEnv([string]$clave, [string]$valor) {
+    $ruta = Join-Path $PSScriptRoot '.env'
+    $lineas = [IO.File]::ReadAllLines($ruta)
+    for ($i = 0; $i -lt $lineas.Count; $i++) {
+        if ($lineas[$i] -match "^\s*$clave\s*=") { $lineas[$i] = "$clave=$valor" }
+    }
+    $utf8SinBom = New-Object System.Text.UTF8Encoding($false)
+    [IO.File]::WriteAllText($ruta, ($lineas -join "`n") + "`n", $utf8SinBom)
+}
+
+# PostgreSQL solo fija la contraseña al crear la base de datos. Si se acaba de
+# generar una DB_PASSWORD nueva pero ya existe el volumen de una instalación
+# anterior (los volúmenes se llaman como la carpeta "docker", así que lo comparten
+# todas las copias del proyecto), el backend no podría conectarse. Se pregunta
+# qué hacer en lugar de arrancar con una configuración que va a fallar.
+function Comprobar-BdAnterior([bool]$contrasenaNueva) {
+    if (-not $contrasenaNueva) { return }
+    $volumenes = (Invocar-Silencioso { docker volume ls -q --filter 'name=docker_db_data' }).Salida
+    if (-not (@($volumenes) -contains 'docker_db_data')) { return }
+    Write-Host ''
+    Escribir-Aviso ('Ya existe una base de datos de una instalación anterior (volumen docker_db_data), ' +
+        'creada con otra contraseña. Con la contraseña recién generada el backend no podría conectarse.')
+    Write-Host '  1) Escribir la contraseña anterior (conserva usuarios, imágenes y anotaciones)'
+    Write-Host '  2) Borrar la base de datos y las imágenes anteriores y empezar de cero'
+    Write-Host '  3) Cancelar'
+    switch (Read-Host 'Opción [1]') {
+        '2' {
+            Escribir-Paso 'Borrando los datos de la instalación anterior'
+            docker compose down -v
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        }
+        '3' { exit 1 }
+        default {
+            $anterior = (Read-Host 'DB_PASSWORD anterior (está en el docker/.env de la otra instalación)').Trim()
+            if (-not $anterior) { Write-Host 'No se ha indicado ninguna contraseña.' -ForegroundColor Red; exit 1 }
+            Fijar-ValorEnv 'DB_PASSWORD' $anterior
+            Write-Host '    DB_PASSWORD actualizada en docker/.env.'
+        }
     }
 }
 
@@ -145,7 +179,8 @@ if (-not (Invocar-Silencioso { docker info }).Ok) {
 }
 
 # --- 1. Configuración y 2. pesos -------------------------------------------
-Preparar-Env
+$contrasenaBdNueva = Preparar-Env
+Comprobar-BdAnterior $contrasenaBdNueva
 Preparar-Pesos
 
 # --- 3. CPU o GPU ----------------------------------------------------------

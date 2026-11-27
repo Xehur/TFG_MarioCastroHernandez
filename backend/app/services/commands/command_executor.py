@@ -7,7 +7,7 @@ existentes. Los comandos ``frontend`` se rechazan (los ejecuta la UI).
 """
 import logging
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from sqlalchemy.orm import Session
 
@@ -32,7 +32,9 @@ class CommandError(Exception):
         self.status_code = status_code
 
 
-def _require_image(db: Session, params: Dict[str, Any]) -> Image:
+def _require_image(
+    db: Session, params: Dict[str, Any], user_id: Optional[int] = None
+) -> Image:
     if "image_id" not in params or params["image_id"] in (None, ""):
         raise CommandError("Falta el parámetro obligatorio 'image_id'", 422)
     try:
@@ -40,7 +42,11 @@ def _require_image(db: Session, params: Dict[str, Any]) -> Image:
     except (TypeError, ValueError):
         raise CommandError("'image_id' debe ser un entero", 422)
 
-    image = db.query(Image).filter(Image.id == image_id).first()
+    query = db.query(Image).filter(Image.id == image_id)
+    if user_id is not None:
+        # Solo imágenes del usuario que ejecuta el comando (404 si es ajena)
+        query = query.filter(Image.user_id == user_id)
+    image = query.first()
     if image is None:
         raise CommandError("Imagen no encontrada", 404)
     if not image.file_path or not os.path.exists(image.file_path):
@@ -48,20 +54,26 @@ def _require_image(db: Session, params: Dict[str, Any]) -> Image:
     return image
 
 
-def _run_full_analysis(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
-    image = _require_image(db, params)
+def _run_full_analysis(
+    db: Session, params: Dict[str, Any], user_id: Optional[int] = None
+) -> Dict[str, Any]:
+    image = _require_image(db, params, user_id)
     result = analysis_service.run_full_analysis(db, image.id, image.file_path)
     return {"analysis_id": result.id, "summary": result.result_data}
 
 
-def _detect_tissue(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
-    image = _require_image(db, params)
+def _detect_tissue(
+    db: Session, params: Dict[str, Any], user_id: Optional[int] = None
+) -> Dict[str, Any]:
+    image = _require_image(db, params, user_id)
     result = tissue_service.generate_tissue_mask(db, image.id, image.file_path)
     return {"analysis_id": result.id, "stats": result.result_data}
 
 
-def _generate_density_map(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
-    image = _require_image(db, params)
+def _generate_density_map(
+    db: Session, params: Dict[str, Any], user_id: Optional[int] = None
+) -> Dict[str, Any]:
+    image = _require_image(db, params, user_id)
     result = density_service.generate_density(db, image.id, image.file_path)
     data = result.density_data or {}
     return {
@@ -72,8 +84,10 @@ def _generate_density_map(db: Session, params: Dict[str, Any]) -> Dict[str, Any]
     }
 
 
-def _classify_tissue_ai(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
-    image = _require_image(db, params)
+def _classify_tissue_ai(
+    db: Session, params: Dict[str, Any], user_id: Optional[int] = None
+) -> Dict[str, Any]:
+    image = _require_image(db, params, user_id)
     result = ai_classification_service.generate_image_classification(
         db, image.id, image.file_path
     )
@@ -94,7 +108,12 @@ _HANDLERS = {
 }
 
 
-def execute(db: Session, command_id: str, params: Dict[str, Any] | None) -> Dict[str, Any]:
+def execute(
+    db: Session,
+    command_id: str,
+    params: Dict[str, Any] | None,
+    user_id: Optional[int] = None,
+) -> Dict[str, Any]:
     """
     Ejecuta un comando de servidor y devuelve su resultado.
 
@@ -117,7 +136,7 @@ def execute(db: Session, command_id: str, params: Dict[str, Any] | None) -> Dict
             f"El comando '{command_id}' no tiene ejecución disponible", 400
         )
 
-    result = handler(db, params)
+    result = handler(db, params, user_id)
     return {
         "command_id": command_id,
         "status": "success",
